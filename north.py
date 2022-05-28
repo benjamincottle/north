@@ -5,6 +5,8 @@ import subprocess
 OP_PUSH_INT = 0
 OP_PRINT = 1
 OP_ADD = 2
+OP_SUB = 3
+
 
 def compile_program_to_asm(program, output_file):
    with open(output_file, "w") as asm:
@@ -59,6 +61,12 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    pop rbx\n")
                 asm.write("    add rax, rbx\n")
                 asm.write("    push rax\n")
+            elif op[0] == OP_SUB:
+                asm.write("    ;; -- SUBTRACT: subtract stack[1] from stack[0] them and push the result back to stack[0] --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    sub rbx, rax\n")
+                asm.write("    push rbx\n")
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -75,7 +83,9 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
         if token[1] == ".":
             program.append((OP_PRINT, ))
         elif token[1] == "+":
-            program.append((OP_ADD, ))        
+            program.append((OP_ADD, ))
+        elif token[1] == "-":
+            program.append((OP_SUB, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
@@ -104,6 +114,7 @@ def load_tokens_from_source(file_path):
     print("tokens", tokens)
     return tokens
 
+
 def usage():
     print("Usage: %s <SOURCE_FILE>" % sys.argv[0])
 
@@ -118,7 +129,6 @@ if __name__ == '__main__':
         usage()
         print("ERROR: no source file provided")
         exit(1)
-
     source_code = sys.argv[1]
     tokens = load_tokens_from_source(source_code)
     program = parse_tokens_to_program(tokens)
