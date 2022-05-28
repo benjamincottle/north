@@ -2,12 +2,13 @@ import sys
 import subprocess
 
 
-OP_PUSH_INT = 0
-OP_PRINT = 1
-OP_ADD = 2
-OP_SUB = 3
-OP_MUL = 4
-
+OP_PUSH_INT = 0     # push int ont stack
+OP_PRINT = 1        # pop stack and print to `stdout` (via itoa() + write syscall) 
+OP_ADD = 2          # pop top two items from stack, add them, and push the result back to stack
+OP_SUB = 3          # pop top two items from stack, subtract stack[1] from stack[0], and push the result back to stack
+OP_MUL = 4          # pop top two items from stack, multiply, and push the result back to stack
+OP_DIV = 5          # pop top two items from stack, divide stack[1] by stack[0], push the quotient back to stack
+OP_MOD = 6          # pop top two items from stack, divide stack[1] by stack[0], push the remainder back to stack
 
 def compile_program_to_asm(program, output_file):
    with open(output_file, "w") as asm:
@@ -50,30 +51,44 @@ def compile_program_to_asm(program, output_file):
         asm.write("_start:\n")
         for op in program:
             if op[0] == OP_PUSH_INT:
-                asm.write("    ;; -- PUSH_INT: push %d to stack[0] --\n" % op[1])
+                asm.write("    ;; -- PUSH_INT %d --\n" % op[1])
                 asm.write("    push %d\n" % op[1])
             elif op[0] == OP_PRINT:
-                asm.write("    ;; -- PRINT: pop stack and print to `stdout` (via itoa() + write syscall) --\n")
+                asm.write("    ;; -- PRINT --\n")
                 asm.write("    pop rdi\n")
                 asm.write("    call print\n")
             elif op[0] == OP_ADD:
-                asm.write("    ;; -- ADD: pop top two items from stack, add, and push the result back to stack --\n")
+                asm.write("    ;; -- ADD --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    add rax, rbx\n")
                 asm.write("    push rax\n")
             elif op[0] == OP_SUB:
-                asm.write("    ;; -- SUB: pop top two items from stack, subtract stack[1] from stack[0], and push the result back to stack --\n")
+                asm.write("    ;; -- SUB --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    sub rbx, rax\n")
                 asm.write("    push rbx\n")
             elif op[0] == OP_MUL:
-                asm.write("    ;; -- MUL: pop top two items from stack, multiply, and push the result back to stack --\n")
+                asm.write("    ;; -- MUL --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    mul rbx\n")
                 asm.write("    push rax\n")    
+            elif op[0] == OP_DIV:
+                asm.write("    ;; -- DIV --\n")
+                asm.write("    mov rdx, 0\n")
+                asm.write("    pop rbx\n")
+                asm.write("    pop rax\n")
+                asm.write("    div rbx\n")
+                asm.write("    push rax\n")
+            elif op[0] == OP_MOD:
+                asm.write("    ;; -- MOD --\n")
+                asm.write("    mov rdx, 0\n")
+                asm.write("    pop rbx\n")
+                asm.write("    pop rax\n")
+                asm.write("    div rbx\n")
+                asm.write("    push rdx\n")
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -95,6 +110,10 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_SUB, ))
         elif token[1] == "*":
             program.append((OP_MUL, ))
+        elif token[1] == "/":
+            program.append((OP_DIV, ))
+        elif token[1] == "%":
+            program.append((OP_MOD, ))            
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
@@ -142,6 +161,6 @@ if __name__ == "__main__":
     tokens = load_tokens_from_source(source_code)
     program = parse_tokens_to_program(tokens)
     compile_program_to_asm(program, "output.asm")
-    run_cmd(["nasm", "-felf64", "output.asm"])
+    run_cmd(["nasm", "-g", "-felf64", "output.asm"])
     run_cmd(["ld", "-o", "output", "output.o"])
 
