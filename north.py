@@ -1,6 +1,7 @@
 import sys
 import subprocess
 
+
 OP_PUSH_INT = 0     # push int ont stack
 OP_PRINT = 1        # pop stack and print to `stdout` (via itoa() + write syscall) 
 OP_ADD = 2          # add: (x, y) -> (x + y)
@@ -15,6 +16,9 @@ OP_EXIT = 10        # pop stack, exit program with exit code stack[0]
 OP_DUP = 11         # duplicate the top item on the stack (x) -> (x, x)
 OP_2DUP = 12        # duplicate the top two items on the stack (x, y) -> (x, y, x, y)
 OP_DROP = 13        # pop the top item from the stack
+OP_2DROP = 14       # pop the top two item from the stack
+OP_OVER = 15        # Place a copy of x on top of the stack. (x, y) -> (x, y, x) 
+OP_2OVER = 16       # (w, x, y, z) -> (w, x, y, z, w, x)
 
 MEMORY_SIZE = 128000
 
@@ -133,6 +137,29 @@ def compile_program_to_asm(program, output_file):
             elif op[0] == OP_DROP:
                 asm.write("    ;; -- DROP --\n")
                 asm.write("    pop rax\n")
+            elif op[0] == OP_2DROP:
+                asm.write("    ;; -- 2DROP --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+            elif op[0] == OP_OVER:
+                asm.write("    ;; -- OVER --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    push rbx\n")
+                asm.write("    push rax\n")
+                asm.write("    push rbx\n")
+            elif op[0] == OP_2OVER:  # (w, x, y, z) -> (w, x, y, z, w, x)
+                asm.write("    ;; -- 2OVER --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n") 
+                asm.write("    pop rcx\n")
+                asm.write("    pop rdx\n")
+                asm.write("    push rdx\n")
+                asm.write("    push rcx\n")
+                asm.write("    push rbx\n") 
+                asm.write("    push rax\n") 
+                asm.write("    push rdx\n")
+                asm.write("    push rcx\n")
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -172,6 +199,12 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_2DUP, ))
         elif token[1] == "drop":
             program.append((OP_DROP, ))
+        elif token[1] == "2drop":
+            program.append((OP_2DROP, ))
+        elif token[1] == "over":
+            program.append((OP_OVER, ))
+        elif token[1] == "2over":
+            program.append((OP_2OVER, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
