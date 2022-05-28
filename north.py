@@ -17,8 +17,11 @@ OP_DUP = 11         # duplicate the top item on the stack (x) -> (x, x)
 OP_2DUP = 12        # duplicate the top two items on the stack (x, y) -> (x, y, x, y)
 OP_DROP = 13        # pop the top item from the stack
 OP_2DROP = 14       # pop the top two item from the stack
-OP_OVER = 15        # Place a copy of x on top of the stack. (x, y) -> (x, y, x) 
-OP_2OVER = 16       # (w, x, y, z) -> (w, x, y, z, w, x)
+OP_OVER = 15        # stack ops: (x, y) -> (x, y, x) 
+OP_2OVER = 16       # stack ops: (w, x, y, z) -> (w, x, y, z, w, x)
+OP_SWAP = 17        # stack ops: (x, y) -> (y, x)
+OP_2SWAP = 18       # stack ops: (w, x, y, z) -> (y, z, w, x)
+OP_ROT = 19         # (x, y, z) -> (y, z, x) Rotate the top three stack entries.   
 
 MEMORY_SIZE = 128000
 
@@ -148,7 +151,7 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    push rbx\n")
                 asm.write("    push rax\n")
                 asm.write("    push rbx\n")
-            elif op[0] == OP_2OVER:  # (w, x, y, z) -> (w, x, y, z, w, x)
+            elif op[0] == OP_2OVER:
                 asm.write("    ;; -- 2OVER --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n") 
@@ -159,6 +162,30 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    push rbx\n") 
                 asm.write("    push rax\n") 
                 asm.write("    push rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_SWAP:
+                asm.write("    ;; -- SWAP --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n") 
+                asm.write("    push rax\n")
+                asm.write("    push rbx\n")
+            elif op[0] == OP_2SWAP:
+                asm.write("    ;; -- 2SWAP --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    pop rcx\n")
+                asm.write("    pop rdx\n")
+                asm.write("    push rbx\n")
+                asm.write("    push rax\n")
+                asm.write("    push rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_ROT:
+                asm.write("    ;; -- ROT --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    pop rcx\n")
+                asm.write("    push rbx\n") 
+                asm.write("    push rax\n") 
                 asm.write("    push rcx\n")
             else:
                 assert False, "Unreachable"
@@ -205,6 +232,12 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_OVER, ))
         elif token[1] == "2over":
             program.append((OP_2OVER, ))
+        elif token[1] == "swap":
+            program.append((OP_SWAP, ))
+        elif token[1] == "2swap":
+            program.append((OP_2SWAP, ))
+        elif token[1] == "rot":
+            program.append((OP_ROT, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
