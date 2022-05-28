@@ -3,6 +3,8 @@ import subprocess
 
 
 OP_PUSH_INT = 0
+OP_PRINT = 1
+OP_ADD = 2
 
 def compile_program_to_asm(program, output_file):
    with open(output_file, "w") as asm:
@@ -45,8 +47,18 @@ def compile_program_to_asm(program, output_file):
         asm.write("_start:\n")
         for op in program:
             if op[0] == OP_PUSH_INT:
-                asm.write("    ;; -- PUSH_INT: push %d onto stack --\n" % op[1])
+                asm.write("    ;; -- PUSH_INT: push %d to stack[0] --\n" % op[1])
                 asm.write("    push %d\n" % op[1])
+            elif op[0] == OP_PRINT:
+                asm.write("    ;; -- PRINT: print stack[0] to `stdout` (via itoa() + write syscall) --\n")
+                asm.write("    pop rdi\n")
+                asm.write("    call print\n")
+            elif op[0] == OP_ADD:
+                asm.write("    ;; -- ADD: add stack[1] and stack[0] and push the result back to stack[0] --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    add rax, rbx\n")
+                asm.write("    push rax\n")
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -61,9 +73,15 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
     program = []
     for token in tokens:
         if token[1] == ".":
-            assert False, "Not implemented"
+            program.append((OP_PRINT, ))
+        elif token[1] == "+":
+            program.append((OP_ADD, ))        
         else:
-            program.append((OP_PUSH_INT, int(token[1])))
+            try:
+                program.append((OP_PUSH_INT, int(token[1])))
+            except ValueError as e:
+                print("%d:%d: %s" % (token[0][0], token[0][1], e))                
+                exit(1)
     print("program", program)
     return program
 
@@ -77,10 +95,11 @@ def load_tokens_from_source(file_path):
             for column in list(enumerate(line[1])):
                 if (not (column[1].isspace())):
                     if (token == ""):
-                        column_loc = column[0]    
+                        column_loc = column[0]
                     token += column[1]
                 else:
-                    tokens.append( ((line_loc, column_loc), token) )
+                    if (not token == ""):  # line contained only none or some whitespace and newline
+                        tokens.append( ((line_loc, column_loc), token) )
                     token = ""
     print("tokens", tokens)
     return tokens
