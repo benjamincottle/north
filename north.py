@@ -6,6 +6,7 @@ OP_PUSH_INT = 0
 OP_PRINT = 1
 OP_ADD = 2
 OP_SUB = 3
+OP_MUL = 4
 
 
 def compile_program_to_asm(program, output_file):
@@ -52,21 +53,27 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    ;; -- PUSH_INT: push %d to stack[0] --\n" % op[1])
                 asm.write("    push %d\n" % op[1])
             elif op[0] == OP_PRINT:
-                asm.write("    ;; -- PRINT: print stack[0] to `stdout` (via itoa() + write syscall) --\n")
+                asm.write("    ;; -- PRINT: pop stack and print to `stdout` (via itoa() + write syscall) --\n")
                 asm.write("    pop rdi\n")
                 asm.write("    call print\n")
             elif op[0] == OP_ADD:
-                asm.write("    ;; -- ADD: add stack[1] and stack[0] and push the result back to stack[0] --\n")
+                asm.write("    ;; -- ADD: pop top two items from stack, add, and push the result back to stack --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    add rax, rbx\n")
                 asm.write("    push rax\n")
             elif op[0] == OP_SUB:
-                asm.write("    ;; -- SUBTRACT: subtract stack[1] from stack[0] them and push the result back to stack[0] --\n")
+                asm.write("    ;; -- SUB: pop top two items from stack, subtract stack[1] from stack[0], and push the result back to stack --\n")
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    sub rbx, rax\n")
                 asm.write("    push rbx\n")
+            elif op[0] == OP_MUL:
+                asm.write("    ;; -- MUL: pop top two items from stack, multiply, and push the result back to stack --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    mul rbx\n")
+                asm.write("    push rax\n")    
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -86,6 +93,8 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_ADD, ))
         elif token[1] == "-":
             program.append((OP_SUB, ))
+        elif token[1] == "*":
+            program.append((OP_MUL, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
@@ -124,7 +133,7 @@ def run_cmd(cmd):
     subprocess.call(cmd)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     if len(sys.argv) < 2:
         usage()
         print("ERROR: no source file provided")
