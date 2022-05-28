@@ -1,0 +1,4 @@
+1 2 min print
+2 1 min print
+1 2 max print
+2 1 max print

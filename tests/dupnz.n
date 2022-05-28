@@ -1,0 +1,2 @@
+14 2 1 dupnz print print print print
+14 2 0 dupnz print print print

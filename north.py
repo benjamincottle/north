@@ -21,47 +21,51 @@ OP_OVER = 15        # stack ops: (x, y) -> (x, y, x)
 OP_2OVER = 16       # stack ops: (w, x, y, z) -> (w, x, y, z, w, x)
 OP_SWAP = 17        # stack ops: (x, y) -> (y, x)
 OP_2SWAP = 18       # stack ops: (w, x, y, z) -> (y, z, w, x)
-OP_ROT = 19         # (x, y, z) -> (y, z, x) Rotate the top three stack entries.   
+OP_ROT = 19         # (x, y, z) -> (y, z, x)  Rotate the top three stack entries.   
+OP_DUPNZ = 20       # (x, 0) -> (x, 0) but (x, y) -> (x, y, y)
+OP_MAX = 21         # (1, 2) -> (2) pop two items, return max
+OP_MIN = 22         # (1, 2) -> (1) pop two items, return min
 
 MEMORY_SIZE = 128000
 
 
 def compile_program_to_asm(program, output_file):
-   with open(output_file, "w") as asm:
+    label_count = 2
+    with open(output_file, "w") as asm:
         asm.write("BITS 64")
         asm.write("segment .text\n")
         asm.write("print:\n")
-        asm.write("    mov     r9, -3689348814741910323\n")
-        asm.write("    sub     rsp, 40\n")
-        asm.write("    mov     BYTE [rsp+31], 10\n")
-        asm.write("    lea     rcx, [rsp+30]\n")
-        asm.write(".L2:\n")
-        asm.write("    mov     rax, rdi\n")
-        asm.write("    lea     r8, [rsp+32]\n")
-        asm.write("    mul     r9\n")
-        asm.write("    mov     rax, rdi\n")
-        asm.write("    sub     r8, rcx\n")
-        asm.write("    shr     rdx, 3\n")
-        asm.write("    lea     rsi, [rdx+rdx*4]\n")
-        asm.write("    add     rsi, rsi\n")
-        asm.write("    sub     rax, rsi\n")
-        asm.write("    add     eax, 48\n")
-        asm.write("    mov     BYTE [rcx], al\n")
-        asm.write("    mov     rax, rdi\n")
-        asm.write("    mov     rdi, rdx\n")
-        asm.write("    mov     rdx, rcx\n")
-        asm.write("    sub     rcx, 1\n")
-        asm.write("    cmp     rax, 9\n")
-        asm.write("    ja      .L2\n")
-        asm.write("    lea     rax, [rsp+32]\n")
-        asm.write("    mov     edi, 1\n")
-        asm.write("    sub     rdx, rax\n")
-        asm.write("    xor     eax, eax\n")
-        asm.write("    lea     rsi, [rsp+32+rdx]\n")
-        asm.write("    mov     rdx, r8\n")
-        asm.write("    mov     rax, 1\n")
+        asm.write("    mov r9, -3689348814741910323\n")
+        asm.write("    sub rsp, 40\n")
+        asm.write("    mov BYTE [rsp+31], 10\n")
+        asm.write("    lea rcx, [rsp+30]\n")
+        asm.write(".L1:\n")
+        asm.write("    mov rax, rdi\n")
+        asm.write("    lea r8, [rsp+32]\n")
+        asm.write("    mul r9\n")
+        asm.write("    mov rax, rdi\n")
+        asm.write("    sub r8, rcx\n")
+        asm.write("    shr rdx, 3\n")
+        asm.write("    lea rsi, [rdx+rdx*4]\n")
+        asm.write("    add rsi, rsi\n")
+        asm.write("    sub rax, rsi\n")
+        asm.write("    add eax, 48\n")
+        asm.write("    mov BYTE [rcx], al\n")
+        asm.write("    mov rax, rdi\n")
+        asm.write("    mov rdi, rdx\n")
+        asm.write("    mov rdx, rcx\n")
+        asm.write("    sub rcx, 1\n")
+        asm.write("    cmp rax, 9\n")
+        asm.write("    ja  .L1\n")
+        asm.write("    lea rax, [rsp+32]\n")
+        asm.write("    mov edi, 1\n")
+        asm.write("    sub rdx, rax\n")
+        asm.write("    xor eax, eax\n")
+        asm.write("    lea rsi, [rsp+32+rdx]\n")
+        asm.write("    mov rdx, r8\n")
+        asm.write("    mov rax, 1\n")
         asm.write("    syscall\n")
-        asm.write("    add     rsp, 40\n")
+        asm.write("    add rsp, 40\n")
         asm.write("    ret\n")
         asm.write("global _start\n")
         asm.write("_start:\n")
@@ -187,6 +191,39 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    push rbx\n") 
                 asm.write("    push rax\n") 
                 asm.write("    push rcx\n")
+            elif op[0] == OP_DUPNZ:
+                asm.write("    ;; -- DUPNZ --\n")  
+                asm.write("    pop rax\n")
+                asm.write("    push rax\n")
+                asm.write("    cmp rax, 0\n")
+                asm.write("    je .L%d\n" % label_count)
+                asm.write("    push rax\n")
+                asm.write(".L%d:\n" % label_count)
+                label_count += 1
+            elif op[0] == OP_MAX:
+                asm.write("    ;; -- MAX --\n") # (2, 1)
+                asm.write("    pop rax\n")      # rax = 1
+                asm.write("    pop rbx\n")      # rbx = 2
+                asm.write("    cmp rbx, rax\n")  # do rbx - rax = 1
+                asm.write("    cmovge rax, rbx\n") # conditional move greater than or equal
+                asm.write("    push rax\n")
+            elif op[0] == OP_MIN:
+                asm.write("    ;; -- MIN --\n") # (2, 1) 
+                asm.write("    pop rax\n")      # rax = 1
+                asm.write("    pop rbx\n")      # rbx = 2
+                asm.write("    cmp rbx, rax\n") # do rbx - rax = 1
+                asm.write("    cmovle rax, rbx\n")
+                asm.write("    push rax\n")
+ 
+#            else operand INTRINSIC_EQ = if*
+#                "    mov rcx, 0\n"          bfd bputs
+#                "    mov rdx, 1\n"          bfd bputs
+#                "    pop rax\n"             bfd bputs
+#                "    pop rbx\n"             bfd bputs
+#                "    cmp rax, rbx\n"        bfd bputs
+#                "    cmove rcx, rdx\n"      bfd bputs
+#                "    push rcx\n"            bfd bputs
+
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -238,6 +275,12 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_2SWAP, ))
         elif token[1] == "rot":
             program.append((OP_ROT, ))
+        elif token[1] == "dupnz":
+            program.append((OP_MAX, ))
+        elif token[1] == "max":
+            program.append((OP_MAX, ))
+        elif token[1] == "min":
+            program.append((OP_MIN, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
