@@ -1,0 +1,4 @@
+88 print
+mem 0 + 97 store
+
+mem 0 + load print

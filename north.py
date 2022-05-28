@@ -1,7 +1,6 @@
 import sys
 import subprocess
 
-
 OP_PUSH_INT = 0     # push int ont stack
 OP_PRINT = 1        # pop stack and print to `stdout` (via itoa() + write syscall) 
 OP_ADD = 2          # pop top two items from stack, add them, and push the result back to stack
@@ -9,6 +8,13 @@ OP_SUB = 3          # pop top two items from stack, subtract stack[1] from stack
 OP_MUL = 4          # pop top two items from stack, multiply, and push the result back to stack
 OP_DIV = 5          # pop top two items from stack, divide stack[1] by stack[0], push the quotient back to stack
 OP_MOD = 6          # pop top two items from stack, divide stack[1] by stack[0], push the remainder back to stack
+OP_MEM = 7          # push memory base address to stack
+OP_STORE = 8        # pop top two items from stack, store data in stack[0] at mem[stack[1]]
+OP_LOAD = 9         # pop stack, load data at mem[stack[0]] back to stack
+OP_EXIT = 10        # pop stack, exit program with exit code stack[0]
+
+MEMORY_SIZE = 128000
+
 
 def compile_program_to_asm(program, output_file):
    with open(output_file, "w") as asm:
@@ -89,6 +95,26 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    pop rax\n")
                 asm.write("    div rbx\n")
                 asm.write("    push rdx\n")
+            elif op[0] == OP_MEM:
+                asm.write("    ;; -- MEM --\n")
+                asm.write("    push mem\n")
+            elif op[0] == OP_STORE:
+                asm.write("    ;; -- STORE --\n")
+                asm.write("    pop rbx\n")
+                asm.write("    pop rax\n")
+                asm.write("    mov [rax], bl\n")
+            elif op[0] == OP_LOAD:
+                asm.write("    ;; -- LOAD --\n")
+                asm.write("    pop rax\n")
+                asm.write("    xor rbx, rbx\n")
+                asm.write("    mov bl, [rax]\n")
+                asm.write("    push rbx\n")
+            elif op[0] == OP_EXIT:
+                asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
+                asm.write("    mov eax, 231\n")
+                asm.write("    pop rdi\n")
+                asm.write("    syscall\n")
+
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -96,13 +122,13 @@ def compile_program_to_asm(program, output_file):
         asm.write("    mov rdi, 0\n")
         asm.write("    syscall\n")
         asm.write("segment .bss\n")
-        asm.write("mem: resb 128000\n")
+        asm.write("mem: resb %d\n" % MEMORY_SIZE)
 
 
 def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'), ((1, 0), '14')]
     program = []
     for token in tokens:
-        if token[1] == ".":
+        if token[1] == "print":
             program.append((OP_PRINT, ))
         elif token[1] == "+":
             program.append((OP_ADD, ))
@@ -113,7 +139,15 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
         elif token[1] == "/":
             program.append((OP_DIV, ))
         elif token[1] == "%":
-            program.append((OP_MOD, ))            
+            program.append((OP_MOD, ))
+        elif token[1] == "mem":
+            program.append((OP_MEM, ))
+        elif token[1] == "store":
+            program.append((OP_STORE, ))
+        elif token[1] == "load":
+            program.append((OP_LOAD, ))
+        elif token[1] == "exit":
+            program.append((OP_EXIT, ))            
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
