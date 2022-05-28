@@ -3,15 +3,18 @@ import subprocess
 
 OP_PUSH_INT = 0     # push int ont stack
 OP_PRINT = 1        # pop stack and print to `stdout` (via itoa() + write syscall) 
-OP_ADD = 2          # pop top two items from stack, add them, and push the result back to stack
-OP_SUB = 3          # pop top two items from stack, subtract stack[1] from stack[0], and push the result back to stack
-OP_MUL = 4          # pop top two items from stack, multiply, and push the result back to stack
-OP_DIV = 5          # pop top two items from stack, divide stack[1] by stack[0], push the quotient back to stack
-OP_MOD = 6          # pop top two items from stack, divide stack[1] by stack[0], push the remainder back to stack
+OP_ADD = 2          # add: (x, y) -> (x + y)
+OP_SUB = 3          # subtract: (x, y) -> (x - y)
+OP_MUL = 4          # multiply: (x, y) -> (x * y)
+OP_DIV = 5          # divide: (x, y) -> ( x / y)
+OP_MOD = 6          # modulus: (x, y) -> (x % y)
 OP_MEM = 7          # push memory base address to stack
 OP_STORE = 8        # pop top two items from stack, store data in stack[0] at mem[stack[1]]
 OP_LOAD = 9         # pop stack, load data at mem[stack[0]] back to stack
 OP_EXIT = 10        # pop stack, exit program with exit code stack[0]
+OP_DUP = 11         # duplicate the top item on the stack (x) -> (x, x)
+OP_2DUP = 12        # duplicate the top two items on the stack (x, y) -> (x, y, x, y)
+OP_DROP = 13        # pop the top item from the stack
 
 MEMORY_SIZE = 128000
 
@@ -114,7 +117,22 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    mov eax, 231\n")
                 asm.write("    pop rdi\n")
                 asm.write("    syscall\n")
-
+            elif op[0] == OP_DUP:
+                asm.write("    ;; -- DUP --\n")
+                asm.write("    pop rax\n")
+                asm.write("    push rax\n")
+                asm.write("    push rax\n")
+            elif op[0] == OP_2DUP:
+                asm.write("    ;; -- 2DUP --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    push rbx\n")
+                asm.write("    push rax\n")
+                asm.write("    push rbx\n")
+                asm.write("    push rax\n")
+            elif op[0] == OP_DROP:
+                asm.write("    ;; -- DROP --\n")
+                asm.write("    pop rax\n")
             else:
                 assert False, "Unreachable"
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
@@ -148,13 +166,19 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_LOAD, ))
         elif token[1] == "exit":
             program.append((OP_EXIT, ))            
+        elif token[1] == "dup":
+            program.append((OP_DUP, ))   
+        elif token[1] == "2dup":
+            program.append((OP_2DUP, ))
+        elif token[1] == "drop":
+            program.append((OP_DROP, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
             except ValueError as e:
                 print("%d:%d: %s" % (token[0][0], token[0][1], e))                
                 exit(1)
-    print("program", program)
+#    print("program", program)
     return program
 
 
@@ -173,7 +197,7 @@ def load_tokens_from_source(file_path):
                     if (not token == ""):  # line contained only none or some whitespace and newline
                         tokens.append( ((line_loc, column_loc), token) )
                     token = ""
-    print("tokens", tokens)
+#    print("tokens", tokens)
     return tokens
 
 
