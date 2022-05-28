@@ -25,6 +25,15 @@ OP_ROT = 19         # (x, y, z) -> (y, z, x)  Rotate the top three stack entries
 OP_DUPNZ = 20       # (x, 0) -> (x, 0) but (x, y) -> (x, y, y)
 OP_MAX = 21         # (1, 2) -> (2) pop two items, return max
 OP_MIN = 22         # (1, 2) -> (1) pop two items, return min
+OP_EQUAL = 23       # (x, x) -> (1) and (x, y) -> (0) pop two items, push 1 if equal, otherwise 0
+OP_NOTEQUAL = 24    # (x, x) -> (0) and (x, y) -> (1) pop two items, push 0 if equal, otherwise 1
+OP_GT = 25          # (1, 2) -> (0) and (2, 1) -> (1) pop two items, push 1 if greater, otherwise 0
+OP_GE = 26          # (1, 2) -> (0) and (2, 1) -> (1) and (1, 1) -> (1) pop two items, push 1 if gte otherwise 0
+OP_LT = 27          # (1, 2) -> (1) and (2, 1) -> (0) pop two items, push 1 if less, otherwise 0
+OP_LE = 28          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
+
+# TODO:
+# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, etc.
 
 MEMORY_SIZE = 128000
 
@@ -201,28 +210,73 @@ def compile_program_to_asm(program, output_file):
                 asm.write(".L%d:\n" % label_count)
                 label_count += 1
             elif op[0] == OP_MAX:
-                asm.write("    ;; -- MAX --\n") # (2, 1)
-                asm.write("    pop rax\n")      # rax = 1
-                asm.write("    pop rbx\n")      # rbx = 2
-                asm.write("    cmp rbx, rax\n")  # do rbx - rax = 1
-                asm.write("    cmovge rax, rbx\n") # conditional move greater than or equal
+                asm.write("    ;; -- MAX --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovge rax, rbx\n")
                 asm.write("    push rax\n")
             elif op[0] == OP_MIN:
-                asm.write("    ;; -- MIN --\n") # (2, 1) 
-                asm.write("    pop rax\n")      # rax = 1
-                asm.write("    pop rbx\n")      # rbx = 2
-                asm.write("    cmp rbx, rax\n") # do rbx - rax = 1
+                asm.write("    ;; -- MIN --\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
                 asm.write("    cmovle rax, rbx\n")
                 asm.write("    push rax\n")
- 
-#            else operand INTRINSIC_EQ = if*
-#                "    mov rcx, 0\n"          bfd bputs
-#                "    mov rdx, 1\n"          bfd bputs
-#                "    pop rax\n"             bfd bputs
-#                "    pop rbx\n"             bfd bputs
-#                "    cmp rax, rbx\n"        bfd bputs
-#                "    cmove rcx, rdx\n"      bfd bputs
-#                "    push rcx\n"            bfd bputs
+            elif op[0] == OP_EQUAL:
+                asm.write("    ;; -- EQ --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmove rcx, rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_NOTEQUAL:
+                asm.write("    ;; -- NEQ --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovl rcx, rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_GT:
+                asm.write("    ;; -- GT --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovg rcx, rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_GE:
+                asm.write("    ;; -- GE --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovge rcx, rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_LT:
+                asm.write("    ;; -- LT --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovl rcx, rdx\n")
+                asm.write("    push rcx\n")
+            elif op[0] == OP_LE:
+                asm.write("    ;; -- LE --\n")
+                asm.write("    mov rcx, 0\n")
+                asm.write("    mov rdx, 1\n")
+                asm.write("    pop rax\n")
+                asm.write("    pop rbx\n")
+                asm.write("    cmp rbx, rax\n")
+                asm.write("    cmovle rcx, rdx\n")
+                asm.write("    push rcx\n")
 
             else:
                 assert False, "Unreachable"
@@ -234,7 +288,7 @@ def compile_program_to_asm(program, output_file):
         asm.write("mem: resb %d\n" % MEMORY_SIZE)
 
 
-def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'), ((1, 0), '14')]
+def parse_tokens_to_program(tokens):
     program = []
     for token in tokens:
         if token[1] == "print":
@@ -281,6 +335,18 @@ def parse_tokens_to_program(tokens):   # tokens [((0, 0), '42'), ((0, 3), '23'),
             program.append((OP_MAX, ))
         elif token[1] == "min":
             program.append((OP_MIN, ))
+        elif token[1] == "=":
+            program.append((OP_EQUAL, ))
+        elif token[1] == "!=":
+            program.append((OP_NOTEQUAL, ))
+        elif token[1] == ">":
+            program.append((OP_GT, ))
+        elif token[1] == ">=":
+            program.append((OP_GE, ))
+        elif token[1] == "<":
+            program.append((OP_LT, ))
+        elif token[1] == "<=":
+            program.append((OP_LE, ))            
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
