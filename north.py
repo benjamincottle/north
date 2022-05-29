@@ -33,7 +33,7 @@ OP_LT = 27          # (1, 2) -> (1) and (2, 1) -> (0) pop two items, push 1 if l
 OP_LE = 28          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
 
 # TODO:
-# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
+# Single Line Comments, ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
 
 MEMORY_SIZE = 128000
 
@@ -366,7 +366,9 @@ def load_tokens_from_source(file_path):
     token = ""
     with open(file_path, "r") as source_file:
         for line in list(enumerate(source_file)):
+            line = (line[0], line[1].split(";", 1)[0])   # single line comment handling
             line_loc = line[0]
+            
             for column in list(enumerate(line[1])):
                 if (not (column[1].isspace())):
                     if (token == ""):
