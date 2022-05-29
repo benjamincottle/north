@@ -33,7 +33,7 @@ OP_LT = 27          # (1, 2) -> (1) and (2, 1) -> (0) pop two items, push 1 if l
 OP_LE = 28          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
 
 # TODO:
-# Single Line Comments, ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
+# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
 
 MEMORY_SIZE = 128000
 
@@ -351,9 +351,8 @@ def parse_tokens_to_program(tokens):
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
             except ValueError as e:
-
                 with open(token[0][0], "r") as source_file:
-                    print(''.join([x for i, x in enumerate(source_file) if i == token[0][1]]), end='')
+                    print(''.join([line for col, line in enumerate(source_file) if col == token[0][1]]), end='')
                     print(" "*token[0][2] + "^")
                 print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
@@ -368,7 +367,6 @@ def load_tokens_from_source(file_path):
         for line in list(enumerate(source_file)):
             line = (line[0], line[1].split(";", 1)[0])   # single line comment handling
             line_loc = line[0]
-            
             for column in list(enumerate(line[1])):
                 if (not (column[1].isspace())):
                     if (token == ""):
@@ -402,4 +400,3 @@ if __name__ == "__main__":
     compile_program_to_asm(program, "output.asm")
     run_cmd(["nasm", "-g", "-felf64", "output.asm"])
     run_cmd(["ld", "-o", "output", "output.o"])
-
