@@ -33,7 +33,7 @@ OP_LT = 27          # (1, 2) -> (1) and (2, 1) -> (0) pop two items, push 1 if l
 OP_LE = 28          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
 
 # TODO:
-# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, etc.
+# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
 
 MEMORY_SIZE = 128000
 
@@ -351,7 +351,11 @@ def parse_tokens_to_program(tokens):
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
             except ValueError as e:
-                print("%d:%d: %s" % (token[0][0], token[0][1], e))                
+
+                with open(token[0][0], "r") as source_file:
+                    print(''.join([x for i, x in enumerate(source_file) if i == token[0][1]]), end='')
+                    print(" "*token[0][2] + "^")
+                print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
 #    print("program", program)
     return program
@@ -370,7 +374,7 @@ def load_tokens_from_source(file_path):
                     token += column[1]
                 else:
                     if (not token == ""):  # line contained only none or some whitespace and newline
-                        tokens.append( ((line_loc, column_loc), token) )
+                        tokens.append( ((source_file.name, line_loc, column_loc), token) )
                     token = ""
 #    print("tokens", tokens)
     return tokens
