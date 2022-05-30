@@ -1,4 +1,3 @@
-from ssl import OP_CIPHER_SERVER_PREFERENCE
 import sys
 import subprocess
 
@@ -40,7 +39,7 @@ OP_RSHIFT = 33         # (x, y) -> (z) Perform a logical right shift of y bit-pl
 
 
 # TODO:
-# Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
+# Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, for, String Literals, character literals, etc.
 
 MEMORY_SIZE = 128000
 
