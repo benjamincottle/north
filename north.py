@@ -42,7 +42,6 @@ MEMORY_SIZE = 128000
 
 
 def compile_program_to_asm(program, output_file):
-    label_count = 2
     with open(output_file, "w") as asm:
         asm.write("BITS 64")
         asm.write("segment .text\n")
@@ -209,10 +208,8 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    pop rax\n")
                 asm.write("    push rax\n")
                 asm.write("    cmp rax, 0\n")
-                asm.write("    je .L%d\n" % label_count)
+                asm.write("    je .L%d\n" % ((op[0]) + 1))
                 asm.write("    push rax\n")
-                asm.write(".L%d:\n" % label_count)
-                label_count += 1
             elif op[1][0] == OP_MAX:
                 asm.write("    ;; -- MAX --\n")
                 asm.write("    pop rax\n")
@@ -287,12 +284,13 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    ;; -- DO --\n")
                 asm.write("    pop rax\n")
                 asm.write("    cmp rax, 1\n")
-                asm.write("    jl .L%d\n" % (op[1][1] + 1))
+                asm.write("    jl .L%d\n" % (op[1][1]))
             elif op[1][0] == OP_DONE:
                 asm.write("    ;; -- DONE --\n")
-                asm.write("    jmp .L%d\n" % (op[1][1] + 1))
+                asm.write("    jmp .L%d\n" % (op[1][1]))
             else:
                 assert False, "Unreachable"
+        asm.write(".L%d:\n" % len(program))                
         asm.write("    ;; -- EXIT: _NR_exit_group syscall --\n")
         asm.write("    mov eax, 231\n")
         asm.write("    mov rdi, 0\n")
@@ -311,8 +309,8 @@ def locate_codeblocks(program):
         elif (program[op_loc][0] == OP_DONE):
             do_loc = block_stack.pop()
             while_loc = block_stack.pop()
-            program[do_loc] = (program[do_loc][0], op_loc)
-            program[op_loc] = (program[op_loc][0], while_loc)
+            program[do_loc] = (program[do_loc][0], (op_loc + 1))
+            program[op_loc] = (program[op_loc][0], (while_loc + 1))
     return program
 
 
@@ -358,7 +356,7 @@ def parse_tokens_to_program(tokens):
         elif token[1] == "rot":
             program.append((OP_ROT, ))
         elif token[1] == "dupnz":
-            program.append((OP_MAX, ))
+            program.append((OP_DUPNZ, ))
         elif token[1] == "max":
             program.append((OP_MAX, ))
         elif token[1] == "min":
@@ -405,8 +403,12 @@ def load_tokens_from_source(file_path):
                     if (token == ""):
                         column_loc = column[0]
                     token += column[1]
+                    if (column[0] == (len(line[1]) - 1)):  # no newline at end of file
+                        if (not (token == "")):
+                            tokens.append( ((source_file.name, line_loc, column_loc), token) )
+                        token = ""                        
                 else:
-                    if (not token == ""):  # line contained only none or some whitespace and newline
+                    if (not (token == "")):
                         tokens.append( ((source_file.name, line_loc, column_loc), token) )
                     token = ""
     return tokens
