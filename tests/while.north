@@ -3,19 +3,13 @@
   1 -
 done drop
 
-;push 10 (10)
-; while evaluate condition (10 10 0 >) -> (10 1) do (10)
-; (10 10) (10)    -- prints 10
-;  (10 1 - ) -> (9)
-; done back to while
-; evaluate condition (9 9 0 >) -> (9 1) do (9)
-; (9 9 ) (9)    -- prints 10
-;  (9 1 - ) -> (8)
-; done back to while
-; ...
-; evaluate condition (0 0 0 >) -> (0 0) do (0)
-;after done
-;()
-
-
+; a nested while loop!
+5 while dup 0 > do
+  dup print
+  3 while dup 0 > do
+    dup print
+    1 -
+  done drop
+  1 -
+done drop
 
