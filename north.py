@@ -1,3 +1,4 @@
+from ssl import OP_CIPHER_SERVER_PREFERENCE
 import sys
 import subprocess
 
@@ -34,9 +35,12 @@ OP_LE = 28          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two 
 OP_WHILE = 29
 OP_DO = 30
 OP_DONE = 31
+OP_LSHIFT = 32         # (x, y) -> (z) Perform a logical left shift of y bit-places on x, giving z
+OP_RSHIFT = 33         # (x, y) -> (z) Perform a logical right shift of y bit-places on x, giving z
+
 
 # TODO:
-# ShiftLeft, ShiftRight, Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
+# Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, while-do-done, for, String Literals, character literals, etc.
 
 MEMORY_SIZE = 128000
 
@@ -288,6 +292,18 @@ def compile_program_to_asm(program, output_file):
             elif op[1][0] == OP_DONE:
                 asm.write("    ;; -- DONE --\n")
                 asm.write("    jmp .L%d\n" % (op[1][1]))
+            elif op[1][0] == OP_LSHIFT:
+                asm.write("    ;; -- LSHIFT --\n")
+                asm.write("    pop rcx\n")
+                asm.write("    pop rax\n")
+                asm.write("    shl rax, cl\n")
+                asm.write("    push rax\n")
+            elif op[1][0] == OP_RSHIFT:
+                asm.write("    ;; -- RSHIFT --\n")
+                asm.write("    pop rcx\n")
+                asm.write("    pop rax\n")
+                asm.write("    shr rax, cl\n")
+                asm.write("    push rax\n")
             else:
                 assert False, "Unreachable"
         asm.write(".L%d:\n" % len(program))                
@@ -379,6 +395,10 @@ def parse_tokens_to_program(tokens):
             program.append((OP_DO, ))
         elif token[1] == "done":
             program.append((OP_DONE, ))
+        elif token[1] == "<<":
+            program.append((OP_LSHIFT, ))
+        elif token[1] == ">>":
+            program.append((OP_RSHIFT, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))
