@@ -1,0 +1,6 @@
+; print out the fibonacci numbers less than 100
+
+1 1 while swap dup 100 < do
+    dup print
+    over + 
+done

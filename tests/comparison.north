@@ -1,9 +1,12 @@
-41 42 = print
-41 41 = print
+41 42 == print
+41 41 == print
 
 41 41 != print
 41 42 != print
-
+88 print
+41 42 != print
+42 41 != print
+88 print
 41 42 > print
 42 41 > print
 

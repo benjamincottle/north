@@ -36,7 +36,9 @@ OP_DO = 30
 OP_DONE = 31
 OP_LSHIFT = 32         # (x, y) -> (z) Perform a logical left shift of y bit-places on x, giving z
 OP_RSHIFT = 33         # (x, y) -> (z) Perform a logical right shift of y bit-places on x, giving z
-
+OP_IF = 34
+OP_ELSE = 35
+OP_ENDIF = 36
 
 # TODO:
 # Or, And, Not, Syscalls, Load and Store differnet memory sizes, if-then-else, for, String Literals, character literals, etc.
@@ -243,7 +245,7 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    pop rax\n")
                 asm.write("    pop rbx\n")
                 asm.write("    cmp rbx, rax\n")
-                asm.write("    cmovl rcx, rdx\n")
+                asm.write("    cmovne rcx, rdx\n")
                 asm.write("    push rcx\n")
             elif op[1][0] == OP_GT:
                 asm.write("    ;; -- GT --\n")
@@ -303,6 +305,17 @@ def compile_program_to_asm(program, output_file):
                 asm.write("    pop rax\n")
                 asm.write("    shr rax, cl\n")
                 asm.write("    push rax\n")
+            elif op[1][0] == OP_IF:
+                asm.write("    ;; -- IF --\n")
+                asm.write("    pop rax\n")
+                asm.write("    cmp rax, 1\n")      
+                asm.write("    jl .L%d\n" % (op[1][1]))
+            elif op[1][0] == OP_ELSE:
+                asm.write("    ;; -- ELSE --\n")
+                asm.write("    jmp .L%d\n" % (op[1][1]))
+            elif op[1][0] == OP_ENDIF:
+                asm.write("    ;; -- ENDIF --\n")                
+
             else:
                 assert False, "Unreachable"
         asm.write(".L%d:\n" % len(program))                
@@ -326,6 +339,15 @@ def locate_codeblocks(program):
             while_loc = block_stack.pop()
             program[do_loc] = (program[do_loc][0], (op_loc + 1))
             program[op_loc] = (program[op_loc][0], (while_loc + 1))
+        elif (program[op_loc][0] == OP_IF):
+            block_stack.append(op_loc)
+        elif (program[op_loc][0] == OP_ELSE):
+            if_loc = block_stack.pop()
+            program[if_loc] = (program[if_loc][0], (op_loc + 1))
+            block_stack.append(op_loc)
+        elif (program[op_loc][0] == OP_ENDIF):
+            if_or_else_loc = block_stack.pop()
+            program[if_or_else_loc] = (program[if_or_else_loc][0], (op_loc + 1))
     return program
 
 
@@ -376,7 +398,7 @@ def parse_tokens_to_program(tokens):
             program.append((OP_MAX, ))
         elif token[1] == "min":
             program.append((OP_MIN, ))
-        elif token[1] == "=":
+        elif token[1] == "==":
             program.append((OP_EQUAL, ))
         elif token[1] == "!=":
             program.append((OP_NOTEQUAL, ))
@@ -398,6 +420,12 @@ def parse_tokens_to_program(tokens):
             program.append((OP_LSHIFT, ))
         elif token[1] == ">>":
             program.append((OP_RSHIFT, ))
+        elif token[1] == "if":
+            program.append((OP_IF, ))
+        elif token[1] == "else":
+            program.append((OP_ELSE, ))
+        elif token[1] == "endif":
+            program.append((OP_ENDIF, ))
         else:
             try:
                 program.append((OP_PUSH_INT, int(token[1])))

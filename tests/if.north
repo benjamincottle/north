@@ -1,0 +1,39 @@
+; (condition) if
+;   <ops>
+; endif
+;
+; (condition) if
+;   <ops>
+; else
+;   <ops>
+; endif
+ 
+ ; should print 14
+ 14 40 10 != if
+    print
+ endif
+
+
+; should not print 23
+ 23 40 10 < if
+    print
+ endif
+
+; should print 26
+ 26 40 10 > if
+    print
+ endif
+
+; should print 0
+23 40 10 < if
+    1 print
+else          
+    0 print
+endif     
+
+; should print 1
+23 40 10 > if
+    1 print
+else          
+    0 print
+endif     
