@@ -461,7 +461,7 @@ if __name__ == "__main__":
     arg_parser.add_argument('-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
     arg_parser.add_argument("-D", dest="Debug", required=False, default=False, action="store_true", help="Use compliation debug mode.")
-    arg_parser.add_argument("-o", dest="output_file", required=False, type=str, default="output", help="Provide an alternative filename for the generated executable.")
+    arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
     arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
     args = arg_parser.parse_args()
 
@@ -476,7 +476,7 @@ if __name__ == "__main__":
         nasm_command.remove("-g")
 
     ld_command = ["ld", "-o", Path(args.input_file).stem, "output.o"]
-    if (not args.output_file == "output"):
+    if (not args.output_file == None):
         ld_command[2] = args.output_file
     
     run_cmd(nasm_command)
