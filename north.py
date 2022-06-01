@@ -462,10 +462,12 @@ if __name__ == "__main__":
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
     arg_parser.add_argument("-D", dest="Debug", required=False, default=False, action="store_true", help="Use compliation debug mode.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
+    arg_parser.add_argument("-r", dest="exec_output", required=False, default=False, action="store_true", help="Additionally execute output on successful compilation.")
     arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
     args = arg_parser.parse_args()
 
     Debug = args.Debug
+    exec_output = args.exec_output
 
     tokens = load_tokens(args.input_file)
     program = locate_blocks(parse_tokens(tokens))
@@ -475,11 +477,16 @@ if __name__ == "__main__":
     if (not args.g):
         nasm_command.remove("-g")
 
-    ld_command = ["ld", "-o", Path(args.input_file).stem, "output.o"]
+    output_file = Path(args.input_file).stem
+    ld_command = ["ld", "-o", output_file, "output.o"]
     if (not args.output_file == None):
         ld_command[2] = args.output_file
     
     run_cmd(nasm_command)
     run_cmd(ld_command)
+
     if not Debug:
         run_cmd(["rm", "output.o", "output.asm"])
+
+    if exec_output:
+        run_cmd(["./" + ld_command[2]])
