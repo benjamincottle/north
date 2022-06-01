@@ -1,12 +1,13 @@
 import sys
 import subprocess
 from enum import Enum, auto
-
+import argparse
 
 # TODO:
 # Or, And, Not, Syscalls, Load and Store differnet memory sizes, for, String Literals, character literals, etc.
 
 Debug = False
+
 MEMORY_SIZE = 128000
 
 
@@ -331,7 +332,7 @@ def locate_blocks(program):
             required_labels.append(op_loc + 1)
 
     if Debug:
-        print("requried_labels: ", required_labels, "\n")
+        print("requried_labels:", required_labels, "\n")
     return (program, required_labels)
 
 
@@ -420,7 +421,7 @@ def parse_tokens(tokens):
                 print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
     if Debug:
-        print("program: ", program, "\n")
+        print("program:", program, "\n")
     return program
 
 
@@ -445,7 +446,7 @@ def load_tokens(file_path):
                         tokens.append( ((source_file.name, line_loc, column_loc), token) )
                     token = ""
     if Debug:
-        print("tokens: ", tokens, "\n")    
+        print("tokens:", tokens, "\n")    
     return tokens
 
 
@@ -454,19 +455,34 @@ def usage():
 
 
 def run_cmd(cmd):
-    print(cmd)
+    if Debug:
+        print(cmd)
     subprocess.call(cmd)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("ERROR: no input_file file provided")
-        usage()
-        exit(1)
-       
-    input_file = sys.argv[1]
-    tokens = load_tokens(input_file)
+    arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. North is a concatenative, stack based language inspired by forth.')
+    arg_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
+    arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
+    arg_parser.add_argument("-D", dest="Debug", required=False, default=False, action="store_true", help="Use compliation debug mode.")
+    arg_parser.add_argument("-o", dest="output_file", required=False, type=str, default="output", help="Provide an alternative filename for the generated executable.")
+    arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
+    args = arg_parser.parse_args()
+
+    Debug = args.Debug
+
+    tokens = load_tokens(args.input_file)
     program = locate_blocks(parse_tokens(tokens))
     translate_to_elf64_asm(program, "output.asm")
-    run_cmd(["nasm", "-g", "-felf64", "output.asm"])
-    run_cmd(["ld", "-o", "output", "output.o"])
+
+    nasm_command = ["nasm", "-g", "-felf64", "output.asm"]
+    if (not args.g):
+        nasm_command.remove("-g")
+
+    ld_command = ["ld", "-o", "output", "output.o"]
+    ld_command[2] = args.output_file
+    
+    run_cmd(nasm_command)
+    run_cmd(ld_command)
+    if not Debug:
+        run_cmd(["rm", "output.o", "output.asm"])
