@@ -2,12 +2,13 @@ import sys
 import subprocess
 from enum import Enum, auto
 import argparse
+from pathlib import Path
+
 
 # TODO:
 # Or, And, Not, Syscalls, Load and Store differnet memory sizes, for, String Literals, character literals, etc.
 
 Debug = False
-
 MEMORY_SIZE = 128000
 
 
@@ -330,7 +331,6 @@ def locate_blocks(program):
             if_or_else_loc = block_stack.pop()
             program[if_or_else_loc] = (program[if_or_else_loc][0], (op_loc + 1))
             required_labels.append(op_loc + 1)
-
     if Debug:
         print("requried_labels:", required_labels, "\n")
     return (program, required_labels)
@@ -450,10 +450,6 @@ def load_tokens(file_path):
     return tokens
 
 
-def usage():
-    print("Usage: %s [-g] [-D] [-o output_file] input_file" % sys.argv[0])
-
-
 def run_cmd(cmd):
     if Debug:
         print(cmd)
@@ -461,8 +457,8 @@ def run_cmd(cmd):
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. North is a concatenative, stack based language inspired by forth.')
-    arg_parser.add_argument('-h', '--help', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
+    arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.')
+    arg_parser.add_argument('-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
     arg_parser.add_argument("-D", dest="Debug", required=False, default=False, action="store_true", help="Use compliation debug mode.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, default="output", help="Provide an alternative filename for the generated executable.")
@@ -479,8 +475,9 @@ if __name__ == "__main__":
     if (not args.g):
         nasm_command.remove("-g")
 
-    ld_command = ["ld", "-o", "output", "output.o"]
-    ld_command[2] = args.output_file
+    ld_command = ["ld", "-o", Path(args.input_file).stem, "output.o"]
+    if (not args.output_file == "output"):
+        ld_command[2] = args.output_file
     
     run_cmd(nasm_command)
     run_cmd(ld_command)
