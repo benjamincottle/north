@@ -8,7 +8,7 @@ from pathlib import Path
 # TODO:
 # Or, And, Not, Syscalls, Load and Store differnet memory sizes, for, String Literals, character literals, etc.
 
-Debug = False
+Debug = 0
 MEMORY_SIZE = 128000
 
 
@@ -21,8 +21,14 @@ class Builtin(Enum):
     OP_DIV = auto()         # divide: (x, y) -> ( x / y)
     OP_MOD = auto()         # modulus: (x, y) -> (x % y)
     OP_MEM = auto()         # push memory base address to stack
-    OP_STORE = auto()       # pop top two items from stack, store data in stack[0] at mem[stack[1]]
-    OP_LOAD = auto()        # pop stack, load data at mem[stack[0]] back to stack
+    OP_STORE8 = auto()      # pop top two items from stack, store data in stack[0] at mem[stack[1]]
+    OP_STORE16 = auto()     # 
+    OP_STORE32 = auto()     # 
+    OP_STORE64 = auto()     # 
+    OP_LOAD8 = auto()       # pop stack, load data at mem[stack[0]] back to stack
+    OP_LOAD16 = auto()      #
+    OP_LOAD32 = auto()      #
+    OP_LOAD64 = auto()      #
     OP_EXIT = auto()        # pop stack, exit program with exit code stack[0]
     OP_DUP = auto()         # duplicate the top item on the stack (x) -> (x, x)
     OP_2DUP = auto()        # duplicate the top two items on the stack (x, y) -> (x, y, x, y)
@@ -53,6 +59,7 @@ class Builtin(Enum):
 
 
 def translate_to_elf64_asm(program, output_file):
+    memory_size = 0
     required_labels = program[1]
     program = program[0]
     with open(output_file, "w") as asm:
@@ -95,13 +102,15 @@ def translate_to_elf64_asm(program, output_file):
         asm.write("_start:\n")
         for op in list(enumerate(program)):
             Builtin_Type = op[1][0]
-            if ((op[0] in required_labels) or (Debug)):
+            if ((op[0] in required_labels) or (Debug in [1, 2])):
                 asm.write(".L%d:\n" % (op[0]))
-            if (Debug):
+            if (Debug in [1, 2]):
                 asm.write("    ;; -- %s --\n" % Builtin_Type.name)
 
             if Builtin_Type == Builtin.OP_PUSH_INT:
-                asm.write("    push     %d\n" % op[1][1])
+                # asm.write("    push     %d\n" % op[1][1])
+                asm.write("    mov     rax, %d\n" % op[1][1])
+                asm.write("    push    rax\n")
             elif Builtin_Type == Builtin.OP_PRINT:
                 asm.write("    pop     rdi\n")
                 asm.write("    call    print\n")
@@ -134,15 +143,42 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    push    rdx\n")
             elif Builtin_Type == Builtin.OP_MEM:
                 asm.write("    push    mem\n")
-            elif Builtin_Type == Builtin.OP_STORE:
+            elif Builtin_Type == Builtin.OP_STORE8:
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    mov     [rax], bl\n")
-            elif Builtin_Type == Builtin.OP_LOAD:
+            elif Builtin_Type == Builtin.OP_STORE16:
+                asm.write("    pop     rbx\n")
+                asm.write("    pop     rax\n")
+                asm.write("    mov     [rax], bx\n")
+            elif Builtin_Type == Builtin.OP_STORE32:
+                asm.write("    pop     rbx\n")
+                asm.write("    pop     rax\n")
+                asm.write("    mov     [rax], ebx\n")
+            elif Builtin_Type == Builtin.OP_STORE64:
+                asm.write("    pop     rbx\n")
+                asm.write("    pop     rax\n")
+                asm.write("    mov     [rax], rbx\n")
+            elif Builtin_Type == Builtin.OP_LOAD8:
                 asm.write("    pop     rax\n")
                 asm.write("    xor     rbx, rbx\n")
                 asm.write("    mov     bl, [rax]\n")
                 asm.write("    push    rbx\n")
+            elif Builtin_Type == Builtin.OP_LOAD16:
+                asm.write("    pop     rax\n")
+                asm.write("    xor     rbx, rbx\n")
+                asm.write("    mov     bx, [rax]\n")
+                asm.write("    push    rbx\n")
+            elif Builtin_Type == Builtin.OP_LOAD32:
+                asm.write("    pop     rax\n")
+                asm.write("    xor     rbx, rbx\n")
+                asm.write("    mov     ebx, [rax]\n")
+                asm.write("    push    rbx\n")           
+            elif Builtin_Type == Builtin.OP_LOAD64:
+                asm.write("    pop     rax\n")
+                asm.write("    xor     rbx, rbx\n")
+                asm.write("    mov     rbx, [rax]\n")
+                asm.write("    push    rbx\n")                
             elif Builtin_Type == Builtin.OP_EXIT:
                 asm.write("    mov     eax, 231\n")
                 asm.write("    pop     rdi\n")
@@ -267,14 +303,6 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovle  rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_WHILE:
-                pass
-            elif Builtin_Type == Builtin.OP_DO:
-                asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 1\n")
-                asm.write("    jl      .L%d\n" % (op[1][1]))
-            elif Builtin_Type == Builtin.OP_DONE:
-                asm.write("    jmp     .L%d\n" % (op[1][1]))
             elif Builtin_Type == Builtin.OP_LSHIFT:
                 asm.write("    pop     rcx\n")
                 asm.write("    pop     rax\n")
@@ -285,6 +313,14 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    pop     rax\n")
                 asm.write("    shr     rax, cl\n")
                 asm.write("    push    rax\n")
+            elif Builtin_Type == Builtin.OP_WHILE:
+                pass
+            elif Builtin_Type == Builtin.OP_DO:
+                asm.write("    pop     rax\n")
+                asm.write("    cmp     rax, 1\n")
+                asm.write("    jl      .L%d\n" % (op[1][1]))
+            elif Builtin_Type == Builtin.OP_DONE:
+                asm.write("    jmp     .L%d\n" % (op[1][1]))
             elif Builtin_Type == Builtin.OP_IF:
                 asm.write("    pop     rax\n")
                 asm.write("    cmp     rax, 1\n")      
@@ -331,7 +367,7 @@ def locate_blocks(program):
             if_or_else_loc = block_stack.pop()
             program[if_or_else_loc] = (program[if_or_else_loc][0], (op_loc + 1))
             required_labels.append(op_loc + 1)
-    if Debug:
+    if Debug == 2:
         print("requried_labels:", required_labels, "\n")
     return (program, required_labels)
 
@@ -353,10 +389,22 @@ def parse_tokens(tokens):
             program.append((Builtin.OP_MOD, ))
         elif token[1] == "mem":
             program.append((Builtin.OP_MEM, ))
-        elif token[1] == "store":
-            program.append((Builtin.OP_STORE, ))
-        elif token[1] == "load":
-            program.append((Builtin.OP_LOAD, ))
+        elif token[1] == "store8":
+            program.append((Builtin.OP_STORE8, ))
+        elif token[1] == "store16":
+            program.append((Builtin.OP_STORE16, ))
+        elif token[1] == "store32":
+            program.append((Builtin.OP_STORE32, ))
+        elif token[1] == "store64":
+            program.append((Builtin.OP_STORE64, ))
+        elif token[1] == "load8":
+            program.append((Builtin.OP_LOAD8, ))
+        elif token[1] == "load16":
+            program.append((Builtin.OP_LOAD16, ))
+        elif token[1] == "load32":
+            program.append((Builtin.OP_LOAD32, ))
+        elif token[1] == "load64":
+            program.append((Builtin.OP_LOAD64, ))
         elif token[1] == "exit":
             program.append((Builtin.OP_EXIT, ))            
         elif token[1] == "dup":
@@ -395,16 +443,16 @@ def parse_tokens(tokens):
             program.append((Builtin.OP_LT, ))
         elif token[1] == "<=":
             program.append((Builtin.OP_LE, ))
+        elif token[1] == "<<":
+            program.append((Builtin.OP_LSHIFT, ))
+        elif token[1] == ">>":
+            program.append((Builtin.OP_RSHIFT, ))
         elif token[1] == "while":
             program.append((Builtin.OP_WHILE, ))
         elif token[1] == "do":
             program.append((Builtin.OP_DO, ))
         elif token[1] == "done":
             program.append((Builtin.OP_DONE, ))
-        elif token[1] == "<<":
-            program.append((Builtin.OP_LSHIFT, ))
-        elif token[1] == ">>":
-            program.append((Builtin.OP_RSHIFT, ))
         elif token[1] == "if":
             program.append((Builtin.OP_IF, ))
         elif token[1] == "else":
@@ -420,7 +468,7 @@ def parse_tokens(tokens):
                     print(" "*token[0][2] + "^")
                 print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
-    if Debug:
+    if Debug == 2:
         print("program:", program, "\n")
     return program
 
@@ -445,13 +493,13 @@ def load_tokens(file_path):
                     if (not (token == "")):
                         tokens.append( ((source_file.name, line_loc, column_loc), token) )
                     token = ""
-    if Debug:
+    if Debug == 2:
         print("tokens:", tokens, "\n")    
     return tokens
 
 
 def run_cmd(cmd):
-    if Debug:
+    if Debug in [1, 2]:
         print(cmd)
     subprocess.call(cmd)
 
@@ -460,7 +508,7 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.')
     arg_parser.add_argument('-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
-    arg_parser.add_argument("-D", dest="Debug", required=False, default=False, action="store_true", help="Use compliation debug mode.")
+    arg_parser.add_argument("-D", dest="Debug", choices=[0, 1, 2], required=False, type=int, default=0, const=0, nargs="?", help="Use compliation debug mode.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
     arg_parser.add_argument("-r", dest="exec_output", required=False, default=False, action="store_true", help="Additionally execute output on successful compilation.")
     arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
@@ -468,6 +516,7 @@ if __name__ == "__main__":
 
     Debug = args.Debug
     exec_output = args.exec_output
+
 
     tokens = load_tokens(args.input_file)
     program = locate_blocks(parse_tokens(tokens))
@@ -485,7 +534,7 @@ if __name__ == "__main__":
     run_cmd(nasm_command)
     run_cmd(ld_command)
 
-    if not Debug:
+    if Debug == 0:
         run_cmd(["rm", "output.o", "output.asm"])
 
     if exec_output:

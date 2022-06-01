@@ -1,4 +1,28 @@
-88 print
-mem 0 + 97 store
+; push a pointer to start of memory to the stack
+mem
 
-mem 0 + load print
+; store an unsigned 8bit int at mem[0]
+mem 0 + 255 store8
+
+; store an unsigned 16bit int at mem[1]
+mem 1 + 65535 store16
+
+; store an unsigned 32bit int at mem[3]
+mem 3 + 4294967295 store32
+
+; store an unsigned 32bit int at mem[7]
+mem 7 + 18446744073709551615 store64
+
+
+
+; load 8bit int at mem[0] and push onto stack
+mem 0 + load8 print
+
+; load 16bit int at mem[1] and push onto stack
+mem 1 + load16 print
+
+; load 32bit int at mem[3] and push onto stack
+mem 3 + load32 print
+
+; load 64bit int at mem[7] and push onto stack
+mem 7 + load64 print
