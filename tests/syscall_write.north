@@ -1,0 +1,71 @@
+;count *buf fd 1 syscall
+
+mem 0 + 72 store8
+mem 1 + 101 store8
+mem 2 + 108 store8
+mem 3 + 108 store8
+mem 4 + 111 store8
+mem 5 + 32 store8
+mem 6 + 74 store8
+mem 7 + 117 store8
+mem 8 + 108 store8
+mem 9 + 105 store8
+mem 10 + 101 store8
+mem 11 + 33 store8
+mem 12 + 33 store8
+mem 13 + 33 store8
+mem 14 + 10 store8
+
+15 mem 1 1 syscall
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+;88 print 
+;
+
+;
+;        asm.write("    pop     rax\n")
+;        asm.write("    pop     rdi\n")
+;        asm.write("    pop     rsi\n")
+;        asm.write("    pop     rdx\n")
+;        asm.write("    syscall\n")
+;
+;
+;System call  %rax 	%rdi	%rsi	%rdx
+;		
+; sys_write	   1     fd     *buf	count		
+;
+;  syscall      1     1      *buf    count	
+;    
+;
+;        asm.write("    mov     edi, 1\n")
+;        asm.write("    sub     rdx, rax\n")
+;        asm.write("    xor     eax, eax\n")
+;        asm.write("    lea     rsi, [rsp+32+rdx]\n")
+;        asm.write("    mov     rdx, r8\n")
+;        asm.write("    mov     rax, 1\n")
+;        asm.write("    syscall\n")
+;
+;fd
+;0	stdin
+;1	stdout
+;2	stderr

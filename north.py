@@ -56,12 +56,12 @@ class Builtin(Enum):
     OP_IF = auto()
     OP_ELSE = auto()
     OP_ENDIF = auto()
+    OP_SYSCALL = auto()
 
 
-def translate_to_elf64_asm(program, output_file):
-    memory_size = 0
-    required_labels = program[1]
-    program = program[0]
+def translate_to_elf64_asm(prog, output_file): # program = ([ ... , (token_loc, token_type, token_value), ... ], [req_labels])
+    program = prog[0]
+    required_labels = prog[1]
     with open(output_file, "w") as asm:
         asm.write("BITS 64\n")
         asm.write("segment .text\n")
@@ -100,111 +100,112 @@ def translate_to_elf64_asm(program, output_file):
         asm.write("    ret\n")
         asm.write("global _start\n")
         asm.write("_start:\n")
-        for op in list(enumerate(program)):
-            Builtin_Type = op[1][0]
+        for op in list(enumerate(program)): # op = ([ ... , ( index, (token_loc, token_type, token_value) ), ... ]
+            token_loc = op[1][0]
+            token_type = op[1][1]
             if ((op[0] in required_labels) or (Debug in [2, 3])):
                 asm.write(".L%d:\n" % (op[0]))
             if (Debug in [2, 3]):
-                asm.write("    ;; -- %s --\n" % Builtin_Type.name)
+                asm.write("    ;; -- %s --\n" % token_type.name)
 
-            if Builtin_Type == Builtin.OP_PUSH_INT:
-                asm.write("    mov     rax, %d\n" % op[1][1])
+            if token_type == Builtin.OP_PUSH_INT:
+                asm.write("    mov     rax, %d\n" % op[1][2])
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_PRINT:
+            elif token_type == Builtin.OP_PRINT:
                 asm.write("    pop     rdi\n")
                 asm.write("    call    print\n")
-            elif Builtin_Type == Builtin.OP_ADD:
+            elif token_type == Builtin.OP_ADD:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    add     rax, rbx\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_SUB:
+            elif token_type == Builtin.OP_SUB:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    sub     rbx, rax\n")
                 asm.write("    push    rbx\n")
-            elif Builtin_Type == Builtin.OP_MUL:
+            elif token_type == Builtin.OP_MUL:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    mul     rbx\n")
                 asm.write("    push    rax\n")    
-            elif Builtin_Type == Builtin.OP_DIV:
+            elif token_type == Builtin.OP_DIV:
                 asm.write("    mov     rdx, 0\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    div     rbx\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_MOD:
+            elif token_type == Builtin.OP_MOD:
                 asm.write("    mov     rdx, 0\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    div     rbx\n")
                 asm.write("    push    rdx\n")
-            elif Builtin_Type == Builtin.OP_MEM:
+            elif token_type == Builtin.OP_MEM:
                 asm.write("    push    mem\n")
-            elif Builtin_Type == Builtin.OP_STORE8:
+            elif token_type == Builtin.OP_STORE8:
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    mov     [rax], bl\n")
-            elif Builtin_Type == Builtin.OP_STORE16:
+            elif token_type == Builtin.OP_STORE16:
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    mov     [rax], bx\n")
-            elif Builtin_Type == Builtin.OP_STORE32:
+            elif token_type == Builtin.OP_STORE32:
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    mov     [rax], ebx\n")
-            elif Builtin_Type == Builtin.OP_STORE64:
+            elif token_type == Builtin.OP_STORE64:
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    mov     [rax], rbx\n")
-            elif Builtin_Type == Builtin.OP_LOAD8:
+            elif token_type == Builtin.OP_LOAD8:
                 asm.write("    pop     rax\n")
                 asm.write("    xor     rbx, rbx\n")
                 asm.write("    mov     bl, [rax]\n")
                 asm.write("    push    rbx\n")
-            elif Builtin_Type == Builtin.OP_LOAD16:
+            elif token_type == Builtin.OP_LOAD16:
                 asm.write("    pop     rax\n")
                 asm.write("    xor     rbx, rbx\n")
                 asm.write("    mov     bx, [rax]\n")
                 asm.write("    push    rbx\n")
-            elif Builtin_Type == Builtin.OP_LOAD32:
+            elif token_type == Builtin.OP_LOAD32:
                 asm.write("    pop     rax\n")
                 asm.write("    xor     rbx, rbx\n")
                 asm.write("    mov     ebx, [rax]\n")
                 asm.write("    push    rbx\n")           
-            elif Builtin_Type == Builtin.OP_LOAD64:
+            elif token_type == Builtin.OP_LOAD64:
                 asm.write("    pop     rax\n")
                 asm.write("    xor     rbx, rbx\n")
                 asm.write("    mov     rbx, [rax]\n")
                 asm.write("    push    rbx\n")                
-            elif Builtin_Type == Builtin.OP_EXIT:
+            elif token_type == Builtin.OP_EXIT:
                 asm.write("    mov     eax, 231\n")
                 asm.write("    pop     rdi\n")
                 asm.write("    syscall\n")
-            elif Builtin_Type == Builtin.OP_DUP:
+            elif token_type == Builtin.OP_DUP:
                 asm.write("    pop     rax\n")
                 asm.write("    push    rax\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_2DUP:
-                asm.write("    pop     rax\n")
-                asm.write("    pop     rbx\n")
-                asm.write("    push    rbx\n")
-                asm.write("    push    rax\n")
-                asm.write("    push    rbx\n")
-                asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_DROP:
-                asm.write("    pop     rax\n")
-            elif Builtin_Type == Builtin.OP_2DROP:
-                asm.write("    pop     rax\n")
-                asm.write("    pop     rbx\n")
-            elif Builtin_Type == Builtin.OP_OVER:
+            elif token_type == Builtin.OP_2DUP:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    push    rbx\n")
                 asm.write("    push    rax\n")
                 asm.write("    push    rbx\n")
-            elif Builtin_Type == Builtin.OP_2OVER:
+                asm.write("    push    rax\n")
+            elif token_type == Builtin.OP_DROP:
+                asm.write("    pop     rax\n")
+            elif token_type == Builtin.OP_2DROP:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+            elif token_type == Builtin.OP_OVER:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    push    rbx\n")
+                asm.write("    push    rax\n")
+                asm.write("    push    rbx\n")
+            elif token_type == Builtin.OP_2OVER:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n") 
                 asm.write("    pop     rcx\n")
@@ -215,12 +216,12 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    push    rax\n") 
                 asm.write("    push    rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_SWAP:
+            elif token_type == Builtin.OP_SWAP:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n") 
                 asm.write("    push    rax\n")
                 asm.write("    push    rbx\n")
-            elif Builtin_Type == Builtin.OP_2SWAP:
+            elif token_type == Builtin.OP_2SWAP:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rcx\n")
@@ -229,32 +230,32 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    push    rax\n")
                 asm.write("    push    rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_ROT:
+            elif token_type == Builtin.OP_ROT:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rcx\n")
                 asm.write("    push    rbx\n") 
                 asm.write("    push    rax\n") 
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_DUPNZ:
+            elif token_type == Builtin.OP_DUPNZ:
                 asm.write("    pop     rax\n")
                 asm.write("    push    rax\n")
                 asm.write("    cmp     rax, 0\n")
                 asm.write("    je      .L%d\n" % (op[0] + 1))
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_MAX:
+            elif token_type == Builtin.OP_MAX:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovge  rax, rbx\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_MIN:
+            elif token_type == Builtin.OP_MIN:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovle  rax, rbx\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_EQUAL:
+            elif token_type == Builtin.OP_EQUAL:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -262,7 +263,7 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmove   rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_NOTEQUAL:
+            elif token_type == Builtin.OP_NOTEQUAL:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -270,7 +271,7 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovne  rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_GT:
+            elif token_type == Builtin.OP_GT:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -278,7 +279,7 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovg   rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_GE:
+            elif token_type == Builtin.OP_GE:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -286,7 +287,7 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovge  rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_LT:
+            elif token_type == Builtin.OP_LT:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -294,7 +295,7 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovl   rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_LE:
+            elif token_type == Builtin.OP_LE:
                 asm.write("    mov     rcx, 0\n")
                 asm.write("    mov     rdx, 1\n")
                 asm.write("    pop     rax\n")
@@ -302,32 +303,45 @@ def translate_to_elf64_asm(program, output_file):
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovle  rcx, rdx\n")
                 asm.write("    push    rcx\n")
-            elif Builtin_Type == Builtin.OP_LSHIFT:
+            elif token_type == Builtin.OP_LSHIFT:
                 asm.write("    pop     rcx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    shl     rax, cl\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_RSHIFT:
+            elif token_type == Builtin.OP_RSHIFT:
                 asm.write("    pop     rcx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    shr     rax, cl\n")
                 asm.write("    push    rax\n")
-            elif Builtin_Type == Builtin.OP_WHILE:
+            elif token_type == Builtin.OP_WHILE:
                 pass
-            elif Builtin_Type == Builtin.OP_DO:
+            elif token_type == Builtin.OP_DO:
                 asm.write("    pop     rax\n")
                 asm.write("    cmp     rax, 1\n")
-                asm.write("    jl      .L%d\n" % (op[1][1]))
-            elif Builtin_Type == Builtin.OP_DONE:
-                asm.write("    jmp     .L%d\n" % (op[1][1]))
-            elif Builtin_Type == Builtin.OP_IF:
+                asm.write("    jl      .L%d\n" % (op[1][2]))
+            elif token_type == Builtin.OP_DONE:
+                asm.write("    jmp     .L%d\n" % (op[1][2]))
+            elif token_type == Builtin.OP_IF:
                 asm.write("    pop     rax\n")
                 asm.write("    cmp     rax, 1\n")      
-                asm.write("    jl      .L%d\n" % (op[1][1]))
-            elif Builtin_Type == Builtin.OP_ELSE:
-                asm.write("    jmp     .L%d\n" % (op[1][1]))
-            elif Builtin_Type == Builtin.OP_ENDIF:
+                asm.write("    jl      .L%d\n" % (op[1][2]))
+            elif token_type == Builtin.OP_ELSE:
+                asm.write("    jmp     .L%d\n" % (op[1][2]))
+            elif token_type == Builtin.OP_ENDIF:
                 pass        
+            elif token_type == Builtin.OP_SYSCALL:
+                if op[1][2] in [0, 1, 2]:
+                    asm.write("    pop     rax\n")
+                    asm.write("    pop     rdi\n")
+                    asm.write("    pop     rsi\n")
+                    asm.write("    pop     rdx\n")
+                    asm.write("    syscall\n")
+                else:
+                    with open(token_loc[0], "r") as source_file:
+                        print(''.join([line for col, line in enumerate(source_file) if col ==  token_loc[1]]), end='')
+                        print(" "*token_loc[2] + "^")                    
+                    raise NotImplementedError("%s:%d:%d: ERROR syscall %d not implemented." % (token_loc[0], token_loc[1], token_loc[2], op[1][2]))                    
+
             else:
                 assert False, "Unreachable"
 
@@ -342,31 +356,36 @@ def translate_to_elf64_asm(program, output_file):
 def locate_blocks(program):
     required_labels = []
     block_stack = []
-    for op_loc in range(len(program)):
-        Builtin_Type = program[op_loc][0]
-        if (Builtin_Type == Builtin.OP_WHILE):
-            block_stack.append(op_loc)
-        elif (Builtin_Type == Builtin.OP_DO):
-            block_stack.append(op_loc)
-        elif (Builtin_Type == Builtin.OP_DONE):
+    for op_label in range(len(program)):      # [ ... ,(token_loc, token_type, token_value), ... ]
+        token_loc = program[op_label][0]
+        token_type = program[op_label][1]
+
+        if (token_type == Builtin.OP_WHILE):
+            block_stack.append(op_label)
+        elif (token_type == Builtin.OP_DO):
+            block_stack.append(op_label)
+        elif (token_type == Builtin.OP_DONE):
             do_loc = block_stack.pop()
             while_loc = block_stack.pop()
-            program[do_loc] = (program[do_loc][0], (op_loc + 1))
-            required_labels.append(op_loc + 1)
-            program[op_loc] = (Builtin_Type, (while_loc + 1))
+            program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1))
+            required_labels.append(op_label + 1)
+            program[op_label] = (token_loc, token_type, (while_loc + 1))
             required_labels.append(while_loc + 1)
-        elif (Builtin_Type == Builtin.OP_IF):
-            block_stack.append(op_loc)
-        elif (Builtin_Type == Builtin.OP_ELSE):
+        elif (token_type == Builtin.OP_IF):
+            block_stack.append(op_label)
+        elif (token_type == Builtin.OP_ELSE):
             if_loc = block_stack.pop()
-            program[if_loc] = (program[if_loc][0], (op_loc + 1))
-            required_labels.append(op_loc + 1)
-            block_stack.append(op_loc)
-        elif (Builtin_Type == Builtin.OP_ENDIF):
+            program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1))
+            required_labels.append(op_label + 1)
+            block_stack.append(op_label)
+        elif (token_type == Builtin.OP_ENDIF):
             if_or_else_loc = block_stack.pop()
-            program[if_or_else_loc] = (program[if_or_else_loc][0], (op_loc + 1))
-            required_labels.append(op_loc + 1)
+            program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1))
+            required_labels.append(op_label + 1)
+        elif (token_type == Builtin.OP_SYSCALL):
+            program[op_label] = (token_loc, token_type, program[op_label - 1][2])
     if Debug == 3:
+        print("program_2:", program, "\n")
         print("requried_labels:", required_labels, "\n")
     return (program, required_labels)
 
@@ -374,93 +393,97 @@ def locate_blocks(program):
 def parse_tokens(tokens):
     program = []
     for token in tokens:
-        if token[1] == "print":
-            program.append((Builtin.OP_PRINT, ))
-        elif token[1] == "+":
-            program.append((Builtin.OP_ADD, ))
-        elif token[1] == "-":
-            program.append((Builtin.OP_SUB, ))
-        elif token[1] == "*":
-            program.append((Builtin.OP_MUL, ))
-        elif token[1] == "/":
-            program.append((Builtin.OP_DIV, ))
-        elif token[1] == "%":
-            program.append((Builtin.OP_MOD, ))
-        elif token[1] == "mem":
-            program.append((Builtin.OP_MEM, ))
-        elif token[1] == "store8":
-            program.append((Builtin.OP_STORE8, ))
-        elif token[1] == "store16":
-            program.append((Builtin.OP_STORE16, ))
-        elif token[1] == "store32":
-            program.append((Builtin.OP_STORE32, ))
-        elif token[1] == "store64":
-            program.append((Builtin.OP_STORE64, ))
-        elif token[1] == "load8":
-            program.append((Builtin.OP_LOAD8, ))
-        elif token[1] == "load16":
-            program.append((Builtin.OP_LOAD16, ))
-        elif token[1] == "load32":
-            program.append((Builtin.OP_LOAD32, ))
-        elif token[1] == "load64":
-            program.append((Builtin.OP_LOAD64, ))
-        elif token[1] == "exit":
-            program.append((Builtin.OP_EXIT, ))            
-        elif token[1] == "dup":
-            program.append((Builtin.OP_DUP, ))   
-        elif token[1] == "2dup":
-            program.append((Builtin.OP_2DUP, ))
-        elif token[1] == "drop":
-            program.append((Builtin.OP_DROP, ))
-        elif token[1] == "2drop":
-            program.append((Builtin.OP_2DROP, ))
-        elif token[1] == "over":
-            program.append((Builtin.OP_OVER, ))
-        elif token[1] == "2over":
-            program.append((Builtin.OP_2OVER, ))
-        elif token[1] == "swap":
-            program.append((Builtin.OP_SWAP, ))
-        elif token[1] == "2swap":
-            program.append((Builtin.OP_2SWAP, ))
-        elif token[1] == "rot":
-            program.append((Builtin.OP_ROT, ))
-        elif token[1] == "dupnz":
-            program.append((Builtin.OP_DUPNZ, ))
-        elif token[1] == "max":
-            program.append((Builtin.OP_MAX, ))
-        elif token[1] == "min":
-            program.append((Builtin.OP_MIN, ))
-        elif token[1] == "==":
-            program.append((Builtin.OP_EQUAL, ))
-        elif token[1] == "!=":
-            program.append((Builtin.OP_NOTEQUAL, ))
-        elif token[1] == ">":
-            program.append((Builtin.OP_GT, ))
-        elif token[1] == ">=":
-            program.append((Builtin.OP_GE, ))
-        elif token[1] == "<":
-            program.append((Builtin.OP_LT, ))
-        elif token[1] == "<=":
-            program.append((Builtin.OP_LE, ))
-        elif token[1] == "<<":
-            program.append((Builtin.OP_LSHIFT, ))
-        elif token[1] == ">>":
-            program.append((Builtin.OP_RSHIFT, ))
-        elif token[1] == "while":
-            program.append((Builtin.OP_WHILE, ))
-        elif token[1] == "do":
-            program.append((Builtin.OP_DO, ))
-        elif token[1] == "done":
-            program.append((Builtin.OP_DONE, ))
-        elif token[1] == "if":
-            program.append((Builtin.OP_IF, ))
-        elif token[1] == "else":
-            program.append((Builtin.OP_ELSE, ))
-        elif token[1] == "endif":
-            program.append((Builtin.OP_ENDIF, ))
+        token_loc = token[0] 
+        token_value = token[1] 
+        if token_value == "print":
+            program.append((token_loc, Builtin.OP_PRINT))
+        elif token_value == "+":
+            program.append((token_loc, Builtin.OP_ADD))
+        elif token_value == "-":
+            program.append((token_loc, Builtin.OP_SUB))
+        elif token_value == "*":
+            program.append((token_loc, Builtin.OP_MUL))
+        elif token_value == "/":
+            program.append((token_loc, Builtin.OP_DIV))
+        elif token_value == "%":
+            program.append((token_loc, Builtin.OP_MOD))
+        elif token_value == "mem":
+            program.append((token_loc, Builtin.OP_MEM))
+        elif token_value == "store8":
+            program.append((token_loc, Builtin.OP_STORE8))
+        elif token_value == "store16":
+            program.append((token_loc, Builtin.OP_STORE16))
+        elif token_value == "store32":
+            program.append((token_loc, Builtin.OP_STORE32))
+        elif token_value == "store64":
+            program.append((token_loc, Builtin.OP_STORE64))
+        elif token_value == "load8":
+            program.append((token_loc, Builtin.OP_LOAD8))
+        elif token_value == "load16":
+            program.append((token_loc, Builtin.OP_LOAD16))
+        elif token_value == "load32":
+            program.append((token_loc, Builtin.OP_LOAD32))
+        elif token_value == "load64":
+            program.append((token_loc, Builtin.OP_LOAD64))
+        elif token_value == "exit":
+            program.append((token_loc, Builtin.OP_EXIT))
+        elif token_value == "dup":
+            program.append((token_loc, Builtin.OP_DUP))
+        elif token_value == "2dup":
+            program.append((token_loc, Builtin.OP_2DUP))
+        elif token_value == "drop":
+            program.append((token_loc, Builtin.OP_DROP))
+        elif token_value == "2drop":
+            program.append((token_loc, Builtin.OP_2DROP))
+        elif token_value == "over":
+            program.append((token_loc, Builtin.OP_OVER))
+        elif token_value == "2over":
+            program.append((token_loc, Builtin.OP_2OVER))
+        elif token_value == "swap":
+            program.append((token_loc, Builtin.OP_SWAP))
+        elif token_value == "2swap":
+            program.append((token_loc, Builtin.OP_2SWAP))
+        elif token_value == "rot":
+            program.append((token_loc, Builtin.OP_ROT))
+        elif token_value == "dupnz":
+            program.append((token_loc, Builtin.OP_DUPNZ))
+        elif token_value == "max":
+            program.append((token_loc, Builtin.OP_MAX))
+        elif token_value == "min":
+            program.append((token_loc, Builtin.OP_MIN))
+        elif token_value == "==":
+            program.append((token_loc, Builtin.OP_EQUAL))
+        elif token_value == "!=":
+            program.append((token_loc, Builtin.OP_NOTEQUAL))
+        elif token_value == ">":
+            program.append((token_loc, Builtin.OP_GT))
+        elif token_value == ">=":
+            program.append((token_loc, Builtin.OP_GE))
+        elif token_value == "<":
+            program.append((token_loc, Builtin.OP_LT))
+        elif token_value == "<=":
+            program.append((token_loc, Builtin.OP_LE))
+        elif token_value == "<<":
+            program.append((token_loc, Builtin.OP_LSHIFT))
+        elif token_value == ">>":
+            program.append((token_loc, Builtin.OP_RSHIFT))
+        elif token_value == "while":
+            program.append((token_loc, Builtin.OP_WHILE))
+        elif token_value == "do":
+            program.append((token_loc, Builtin.OP_DO))
+        elif token_value == "done":
+            program.append((token_loc, Builtin.OP_DONE))
+        elif token_value == "if":
+            program.append((token_loc, Builtin.OP_IF))
+        elif token_value == "else":
+            program.append((token_loc, Builtin.OP_ELSE))
+        elif token_value == "endif":
+            program.append((token_loc, Builtin.OP_ENDIF))
+        elif token_value == "syscall":
+            program.append((token_loc, Builtin.OP_SYSCALL))
         else:
             try:
-                program.append((Builtin.OP_PUSH_INT, int(token[1])))
+                program.append((token_loc, Builtin.OP_PUSH_INT, int(token_value)))
             except ValueError as e:
                 with open(token[0][0], "r") as source_file:
                     print(''.join([line for col, line in enumerate(source_file) if col == token[0][1]]), end='')
@@ -468,7 +491,8 @@ def parse_tokens(tokens):
                 print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
     if Debug == 3:
-        print("program:", program, "\n")
+        print("program_1:", program, "\n")
+
     return program
 
 
