@@ -102,13 +102,12 @@ def translate_to_elf64_asm(program, output_file):
         asm.write("_start:\n")
         for op in list(enumerate(program)):
             Builtin_Type = op[1][0]
-            if ((op[0] in required_labels) or (Debug in [1, 2])):
+            if ((op[0] in required_labels) or (Debug in [2, 3])):
                 asm.write(".L%d:\n" % (op[0]))
-            if (Debug in [1, 2]):
+            if (Debug in [2, 3]):
                 asm.write("    ;; -- %s --\n" % Builtin_Type.name)
 
             if Builtin_Type == Builtin.OP_PUSH_INT:
-                # asm.write("    push     %d\n" % op[1][1])
                 asm.write("    mov     rax, %d\n" % op[1][1])
                 asm.write("    push    rax\n")
             elif Builtin_Type == Builtin.OP_PRINT:
@@ -367,7 +366,7 @@ def locate_blocks(program):
             if_or_else_loc = block_stack.pop()
             program[if_or_else_loc] = (program[if_or_else_loc][0], (op_loc + 1))
             required_labels.append(op_loc + 1)
-    if Debug == 2:
+    if Debug == 3:
         print("requried_labels:", required_labels, "\n")
     return (program, required_labels)
 
@@ -468,7 +467,7 @@ def parse_tokens(tokens):
                     print(" "*token[0][2] + "^")
                 print("%s:%d:%d: %s" % (token[0][0], token[0][1], token[0][2], e))
                 exit(1)
-    if Debug == 2:
+    if Debug == 3:
         print("program:", program, "\n")
     return program
 
@@ -493,13 +492,13 @@ def load_tokens(file_path):
                     if (not (token == "")):
                         tokens.append( ((source_file.name, line_loc, column_loc), token) )
                     token = ""
-    if Debug == 2:
+    if Debug == 3:
         print("tokens:", tokens, "\n")    
     return tokens
 
 
 def run_cmd(cmd):
-    if Debug in [1, 2]:
+    if Debug in [1, 2, 3]:
         print(cmd)
     subprocess.call(cmd)
 
@@ -508,34 +507,43 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.')
     arg_parser.add_argument('-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
-    arg_parser.add_argument("-D", dest="Debug", choices=[0, 1, 2], required=False, type=int, default=0, const=0, nargs="?", help="Use compliation debug mode.")
+    arg_parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
     arg_parser.add_argument("-r", dest="exec_output", required=False, default=False, action="store_true", help="Additionally execute output on successful compilation.")
     arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
     args = arg_parser.parse_args()
 
-    Debug = args.Debug
+    input_file = args.input_file
+    asm_file = Path(input_file).stem + ".asm"
+    o_file = Path(input_file).stem + ".o"
+    output_file = Path(input_file).stem
+
+    if (not args.output_file == None):
+        asm_file = args.output_file + ".asm"
+        o_file = args.output_file + ".o"
+        output_file = args.output_file
+
+    Debug = args.D
     exec_output = args.exec_output
 
+    nasm_command = ["nasm", "-g", "-felf64", asm_file]
+    ld_command = ["ld", "-o", output_file, o_file]
+    cleanup_command = ["rm", asm_file, o_file]
 
-    tokens = load_tokens(args.input_file)
-    program = locate_blocks(parse_tokens(tokens))
-    translate_to_elf64_asm(program, "output.asm")
-
-    nasm_command = ["nasm", "-g", "-felf64", "output.asm"]
     if (not args.g):
         nasm_command.remove("-g")
 
-    output_file = Path(args.input_file).stem
-    ld_command = ["ld", "-o", output_file, "output.o"]
-    if (not args.output_file == None):
-        ld_command[2] = args.output_file
-    
+    if Debug in [1, 2]:
+        cleanup_command.remove(asm_file)
+
+    tokens = load_tokens(input_file)
+    program = locate_blocks(parse_tokens(tokens))
+    translate_to_elf64_asm(program, asm_file)
     run_cmd(nasm_command)
     run_cmd(ld_command)
-
-    if Debug == 0:
-        run_cmd(["rm", "output.o", "output.asm"])
+    
+    if not Debug == 3:
+        run_cmd(cleanup_command)
 
     if exec_output:
-        run_cmd(["./" + ld_command[2]])
+        run_cmd(["./" + output_file])
