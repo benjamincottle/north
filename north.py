@@ -1,4 +1,3 @@
-from ast import NotEq
 import sys
 import subprocess
 from enum import Enum, auto
@@ -60,6 +59,17 @@ class Builtin(Enum):
     OP_SYSCALL = auto()
 
 
+def print_compilation_error(token, error_msg):   # (token_loc, token_type, token_value), "string"
+    token_loc = token[0]
+    with open(token_loc[0], "r") as input_file:
+        input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+        if input_line[-1] != "\n":
+            input_line += "\n"
+        print(input_line, end="")
+        print(" "*token_loc[2] + "^")
+        print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg))
+
+
 def translate_to_elf64_asm(program, required_labels, output_file): # program = [ ... , (token_loc, token_type, token_value), ... ]
     with open(output_file, "w") as asm:
         asm.write("BITS 64\n")
@@ -100,7 +110,6 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
         asm.write("global _start\n")
         asm.write("_start:\n")
         for op in list(enumerate(program)): # op = ([ ... , ( index, (token_loc, token_label_req, token_type, token_value) ), ... ]
-            token_loc = op[1][0]
             token_type = op[1][1]
             if ((op[0] in required_labels) or (Debug in [2, 3])):
                 asm.write(".L%d:\n" % (op[0]))
@@ -337,12 +346,9 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     asm.write("    syscall\n")
                 else:
                     try:
-                        raise NotImplementedError("ERROR syscall %d not implemented." % (op[1][2]))
+                        raise NotImplementedError()
                     except NotImplementedError as e:
-                        with open(token_loc[0], "r") as input_file:
-                            print(''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]), end='')
-                            print(" "*token_loc[2] + "^")
-                        print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], e))
+                        print_compilation_error(op[1], "ERROR syscall %d not implemented" % (op[1][2]))
                         exit(1)
 
             else:
@@ -370,46 +376,22 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 do_loc = block_stack.pop()
             except IndexError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             try:
-                assert program[do_loc][1] == Builtin.OP_DO, "`done` missing matching `do`"
+                assert program[do_loc][1] == Builtin.OP_DO
             except AssertionError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             try:
                 while_loc = block_stack.pop()
             except IndexError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             try:
-                assert program[while_loc][1] == Builtin.OP_WHILE, "`done` missing matching `while`"
+                assert program[while_loc][1] == Builtin.OP_WHILE 
             except AssertionError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1)) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
@@ -421,24 +403,12 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 if_loc = block_stack.pop()
             except IndexError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             try:
-                assert program[if_loc][1] == Builtin.OP_IF, "`else` can only be used in `if` block"
+                assert program[if_loc][1] == Builtin.OP_IF 
             except AssertionError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1)) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
@@ -447,24 +417,12 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 if_or_else_loc = block_stack.pop()
             except IndexError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
             try:
                 assert (program[if_or_else_loc][1] == Builtin.OP_IF) or (program[if_or_else_loc][1] == Builtin.OP_ELSE), "`endif` missing matching `if` or `else` block"
             except AssertionError as e:
-                with open(token_loc[0], "r") as input_file:
-                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-                    if input_line[-1] != "\n":
-                        input_line += "\n"
-                    print(input_line, end="")
-                    print(" "*token_loc[2] + "^")
-                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
                 exit(1)
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
@@ -473,19 +431,11 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value 
 
     try:
-        assert block_stack == [], "not all while-do-done if-else-endif blocks have matching tokens"  # block_stack is a list of indexes of left over tokens
+        assert block_stack == []  # block_stack is a list of indexes of left over tokens
     except AssertionError as e:
-        left_over_token_loc = block_stack.pop()
-        left_over_token = program[left_over_token_loc]
-        token_loc = left_over_token[0]
+        left_over_token = program[block_stack.pop()]
         token_type = left_over_token[1]
-        with open(token_loc[0], "r") as input_file:
-            input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-            if input_line[-1] != "\n":
-                input_line += "\n"
-            print(input_line, end="")
-            print(" "*token_loc[2] + "^")
-            print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+        print_compilation_error(left_over_token, "ERROR unmatched token `%s`" % token_type.name)
         exit(1)
 
     if Debug == 3:
@@ -588,10 +538,7 @@ def parse_tokens(tokens):
             try:
                 program.append((token_loc, Builtin.OP_PUSH_INT, int(token_value)))
             except ValueError as e:
-                with open(token[0][0], "r") as input_file:
-                    print(''.join([line for col, line in enumerate(input_file) if col == token[0][1]]), end='')
-                    print(" "*token[0][2] + "^")
-                print("%s:%d:%d: ERROR invalid token, `%s` is not defined." % (token[0][0], token[0][1], token[0][2], token_value))
+                print_compilation_error(token, "ERROR invalid token `%s`" % token_value)
                 exit(1)
     if Debug == 3:
         print("program_1:", program, "\n")
