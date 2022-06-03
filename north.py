@@ -402,9 +402,22 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 assert False, "Unreachable"
 
         asm.write(".L%d:\n" % len(program))         # implicit exit       
+
+
+        asm.write("    mov     rax, 1\n")
+        asm.write("    mov     rdi, 1\n")
+        asm.write("    mov     rsi, str0\n")
+        asm.write("    mov     rdx, str0_len\n")
+        asm.write("    syscall\n")
+
         asm.write("    mov     eax, 231\n")
         asm.write("    mov     rdi, 0\n")
         asm.write("    syscall\n")
+
+        asm.write("section .rodata\n")
+        asm.write("str0: db \"Hello, world!\", 10\n")
+        asm.write("str0_len: equ $ - str0\n")
+
         asm.write("segment .bss\n")
         asm.write("mem: resb %d\n" % MEMORY_SIZE)
 
@@ -601,7 +614,13 @@ def load_tokens(file_path):
             line = (line[0], line[1].split(";", 1)[0]) # single line comment handling
             line_loc = line[0]
             for column in list(enumerate(line[1])):
-                if (not (column[1].isspace())):
+                if ((column[1].isspace()) and (token.count("\"") == 2)):
+                    if (not (token == "")):
+                        tokens.append( ((input_file.name, line_loc, column_loc), token) )
+                    token = ""  
+                elif ((column[1].isspace()) and (token.count("\"") == 1)):
+                    token += column[1]
+                elif (not (column[1].isspace())):
                     if (token == ""):
                         column_loc = column[0]
                     token += column[1]
@@ -613,6 +632,7 @@ def load_tokens(file_path):
                     if (not (token == "")):
                         tokens.append( ((input_file.name, line_loc, column_loc), token) )
                     token = ""
+                
     if Debug == 3:
         print("tokens:", tokens, "\n")    
     return tokens

@@ -1,1 +1,5 @@
-"this is is string literal"
+
+;count *buf fd 1 syscall
+90 drop " the dog" 1 1 syscall
+
+
