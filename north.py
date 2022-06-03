@@ -1,3 +1,4 @@
+from ast import NotEq
 import sys
 import subprocess
 from enum import Enum, auto
@@ -366,26 +367,126 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         elif (token_type == Builtin.OP_DO):
             block_stack.append(op_label)
         elif (token_type == Builtin.OP_DONE):
-            do_loc = block_stack.pop()
-            while_loc = block_stack.pop()
-            program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1))
+            try:
+                do_loc = block_stack.pop()
+            except IndexError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            try:
+                assert program[do_loc][1] == Builtin.OP_DO, "`done` missing matching `do`"
+            except AssertionError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            try:
+                while_loc = block_stack.pop()
+            except IndexError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            try:
+                assert program[while_loc][1] == Builtin.OP_WHILE, "`done` missing matching `while`"
+            except AssertionError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1)) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
-            program[op_label] = (token_loc, token_type, (while_loc + 1))
+            program[op_label] = (token_loc, token_type, (while_loc + 1)) # done has the while + 1 op's # as val
             required_labels.append(while_loc + 1)
         elif (token_type == Builtin.OP_IF):
             block_stack.append(op_label)
         elif (token_type == Builtin.OP_ELSE):
-            if_loc = block_stack.pop()
-            program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1))
+            try:
+                if_loc = block_stack.pop()
+            except IndexError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            try:
+                assert program[if_loc][1] == Builtin.OP_IF, "`else` can only be used in `if` block"
+            except AssertionError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1)) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
             block_stack.append(op_label)
         elif (token_type == Builtin.OP_ENDIF):
-            if_or_else_loc = block_stack.pop()
-            program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1))
+            try:
+                if_or_else_loc = block_stack.pop()
+            except IndexError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+            try:
+                assert (program[if_or_else_loc][1] == Builtin.OP_IF) or (program[if_or_else_loc][1] == Builtin.OP_ELSE), "`endif` missing matching `if` or `else` block"
+            except AssertionError as e:
+                with open(token_loc[0], "r") as input_file:
+                    input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+                    if input_line[-1] != "\n":
+                        input_line += "\n"
+                    print(input_line, end="")
+                    print(" "*token_loc[2] + "^")
+                    print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+                exit(1)
+
+            program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
         elif (token_type == Builtin.OP_SYSCALL):
-            program[op_label] = (token_loc, token_type, program[op_label - 1][2])
-    print("All blocks matched, block_stack is empty?", block_stack == [])
+            program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value 
+
+    try:
+        assert block_stack == [], "not all while-do-done if-else-endif blocks have matching tokens"  # block_stack is a list of indexes of left over tokens
+    except AssertionError as e:
+        left_over_token_loc = block_stack.pop()
+        left_over_token = program[left_over_token_loc]
+        token_loc = left_over_token[0]
+        token_type = left_over_token[1]
+        with open(token_loc[0], "r") as input_file:
+            input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+            if input_line[-1] != "\n":
+                input_line += "\n"
+            print(input_line, end="")
+            print(" "*token_loc[2] + "^")
+            print("%s:%d:%d: ERROR unmatched token `%s`" % (token_loc[0], token_loc[1], token_loc[2], token_type.name))
+        exit(1)
 
     if Debug == 3:
         print("program_2:", program, "\n")
