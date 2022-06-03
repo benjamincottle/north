@@ -15,32 +15,7 @@ mem 11 + 33 store8
 mem 12 + 33 store8
 mem 13 + 33 store8
 mem 14 + 10 store8
-
 15 mem 1 1 syscall
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-;88 print 
-;
 
 ;
 ;        asm.write("    pop     rax\n")
