@@ -59,6 +59,53 @@ class Builtin(Enum):
     OP_SYSCALL = auto()
 
 
+op_readable = {
+    "OP_PRINT": "print",
+    "OP_ADD": "+",
+    "OP_SUB": "-",
+    "OP_MUL": "*",
+    "OP_DIV": "/",
+    "OP_MOD": "%",
+    "OP_MEM": "mem",
+    "OP_STORE8": "store8",
+    "OP_STORE16": "store16",
+    "OP_STORE32": "store32",
+    "OP_STORE64": "store64",
+    "OP_LOAD8": "load8",
+    "OP_LOAD16": "load16",
+    "OP_LOAD32": "load32",
+    "OP_LOAD64": "load64",
+    "OP_EXIT": "exit",
+    "OP_DUP": "dup",
+    "OP_2DUP": "2dup",
+    "OP_DROP": "drop",
+    "OP_2DROP": "2drop",
+    "OP_OVER": "over",
+    "OP_2OVER": "2over",
+    "OP_SWAP": "swap",
+    "OP_2SWAP": "2swap",
+    "OP_ROT": "rot",
+    "OP_DUPNZ": "dupnz",
+    "OP_MAX": "max",
+    "OP_MIN": "min",
+    "OP_EQUAL": "==",
+    "OP_NOTEQUAL": "!=",
+    "OP_GT": ">",
+    "OP_GE": "<=",
+    "OP_LT": "<",
+    "OP_LE": "<=",
+    "OP_LSHIFT": "<<",
+    "OP_RSHIFT": ">>",
+    "OP_WHILE": "while",
+    "OP_DO": "do",
+    "OP_DONE": "done",
+    "OP_IF": "if",
+    "OP_ELSE": "else",
+    "OP_ENDIF": "endif",
+    "OP_SYSCALL": "syscall",
+}
+
+
 def print_compilation_error(token, error_msg):   # (token_loc, token_type, token_value), "string"
     token_loc = token[0]
     with open(token_loc[0], "r") as input_file:
@@ -348,7 +395,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     try:
                         raise NotImplementedError()
                     except NotImplementedError as e:
-                        print_compilation_error(op[1], "ERROR syscall %d not implemented" % (op[1][2]))
+                        print_compilation_error(op[1], "ERROR `syscall` %d is not implemented" % (op[1][2]))
                         exit(1)
 
             else:
@@ -376,22 +423,22 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 do_loc = block_stack.pop()
             except IndexError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
                 assert program[do_loc][1] == Builtin.OP_DO
             except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
                 while_loc = block_stack.pop()
             except IndexError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
                 assert program[while_loc][1] == Builtin.OP_WHILE 
             except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1)) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
@@ -403,12 +450,12 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 if_loc = block_stack.pop()
             except IndexError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
                 assert program[if_loc][1] == Builtin.OP_IF 
             except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1)) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
@@ -417,12 +464,12 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             try:
                 if_or_else_loc = block_stack.pop()
             except IndexError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
                 assert (program[if_or_else_loc][1] == Builtin.OP_IF) or (program[if_or_else_loc][1] == Builtin.OP_ELSE), "`endif` missing matching `if` or `else` block"
             except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % token_type.name)
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
@@ -435,7 +482,7 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
     except AssertionError as e:
         left_over_token = program[block_stack.pop()]
         token_type = left_over_token[1]
-        print_compilation_error(left_over_token, "ERROR unmatched token `%s`" % token_type.name)
+        print_compilation_error(left_over_token, "ERROR unmatched token `%s`" % op_readable[token_type.name])
         exit(1)
 
     if Debug == 3:
