@@ -1,5 +1,21 @@
-
 ;count *buf fd 1 syscall
-90 drop " the dog" 1 1 syscall
+; "string" 1 1 syscall
+; will: push str_len
+;       push str_addr
+;       push 1
+;       push 1
+; the syscall consumes 4 args and the return code (number of bytes written) is pushed to the stack
+; supports \n newline char inline
+
+"" 1 1 syscall drop
+"\n" 1 1 syscall drop
+"\nHello" 1 1 syscall drop
+"Hello" 1 1 syscall drop
+"Hello World!" 1 1 syscall drop
+"Hello World!\n" 1 1 syscall drop
+"   Hello World!\n" 1 1 syscall drop
+"Hello World!\n\n" 1 1 syscall drop
+"Hello World!\nMore String\n" 1 1 syscall drop
+
 
 

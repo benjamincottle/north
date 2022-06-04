@@ -1,5 +1,5 @@
 ;count *buf fd 1 syscall
-
+; the ´syscall´ consumes 4 args and the return code (number of bytes written) is pushed to the stack
 mem 0 + 72 store8
 mem 1 + 101 store8
 mem 2 + 108 store8

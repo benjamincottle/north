@@ -6,14 +6,15 @@ from pathlib import Path
 
 
 # TODO:
-# Or, And, Not, Syscalls, Load and Store differnet memory sizes, for, String Literals, character literals, etc.
+# Or, And, Not, Syscalls, character literals, etc.
 
 Debug = 0
 MEMORY_SIZE = 128000
 
 
 class Builtin(Enum):
-    OP_PUSH_INT = auto()    # push int ont stack
+    OP_PUSH_INT = auto()    # push int onto stack
+    OP_PUSH_STR = auto()    # push str_size and &str onto stack
     OP_PRINT = auto()       # pop stack and print to `stdout` (via itoa() + write syscall) 
     OP_ADD = auto()         # add: (x, y) -> (x + y)
     OP_SUB = auto()         # subtract: (x, y) -> (x - y)
@@ -57,6 +58,7 @@ class Builtin(Enum):
     OP_ELSE = auto()
     OP_ENDIF = auto()
     OP_SYSCALL = auto()
+    
 
 
 op_readable = {
@@ -110,7 +112,7 @@ def print_compilation_error(token, error_msg):   # (token_loc, token_type, token
     token_loc = token[0]
     with open(token_loc[0], "r") as input_file:
         input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
-        if input_line[-1] != "\n":
+        if input_line[-1:] != "\n":
             input_line += "\n"
         print(input_line, end="")
         print(" "*token_loc[2] + "^")
@@ -119,6 +121,7 @@ def print_compilation_error(token, error_msg):   # (token_loc, token_type, token
 
 def translate_to_elf64_asm(program, required_labels, output_file): # program = [ ... , (token_loc, token_type, token_value), ... ]
     with open(output_file, "w") as asm:
+        ro_data = []
         asm.write("BITS 64\n")
         asm.write("segment .text\n")
         asm.write("print:\n")
@@ -391,35 +394,48 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     asm.write("    pop     rsi\n")
                     asm.write("    pop     rdx\n")
                     asm.write("    syscall\n")
+                    asm.write("    push     rax\n")
                 else:
                     try:
                         raise NotImplementedError()
                     except NotImplementedError as e:
                         print_compilation_error(op[1], "ERROR `syscall` %d is not implemented" % (op[1][2]))
                         exit(1)
+            elif token_type == Builtin.OP_PUSH_STR:
+                ro_data.append(op[1][2])     # ro_data = [string1, string2, ...] str_label = len(ro_data) - 1
+                asm.write("    push    %s\n" % ("str" + str(len(ro_data) - 1) + "_len"))
+                asm.write("    push    %s\n" % ("str" + str(len(ro_data) - 1)))
 
             else:
                 assert False, "Unreachable"
 
         asm.write(".L%d:\n" % len(program))         # implicit exit       
-
-
-        asm.write("    mov     rax, 1\n")
-        asm.write("    mov     rdi, 1\n")
-        asm.write("    mov     rsi, str0\n")
-        asm.write("    mov     rdx, str0_len\n")
-        asm.write("    syscall\n")
-
         asm.write("    mov     eax, 231\n")
         asm.write("    mov     rdi, 0\n")
         asm.write("    syscall\n")
 
-        asm.write("section .rodata\n")
-        asm.write("str0: db \"Hello, world!\", 10\n")
-        asm.write("str0_len: equ $ - str0\n")
+        asm.write("section .rodata\n")              # .ro_data section
+        for string in list(enumerate(ro_data)):
+            str_label = "str%d" % (string[0])
+            string = bytes(string[1][1:-1], "utf-8").decode('unicode-escape').split("\n")
+            str_data = ""
+            for substring in list(enumerate(string)): #[(0, 'Hello World!'), (1, 'more str'), (2, '')]
+                if ((substring[0] == 0) and (not((substring[0] == (len(string) - 1))))): # the first substring but not the last
+                    str_data += "\"" + substring[1] + "\"" + ", 10"
+                if ((substring[0] == 0) and (((substring[0] == (len(string) - 1))))): # the first and last substring
+                    str_data += "\"" + substring[1] + "\""
+                elif (not (substring[0] == 0)) and (not (substring[0] == (len(string) - 1))): # not the first or the last substring
+                    str_data += ", \"" + substring[1] + "\"" + ", 10"
+                elif (  (substring[0] == (len(string) - 1)) and (not substring[1] == "") ):  # the last substring and it's not ""
+                    str_data += ", \"" + substring[1] + "\""
+                elif (substring[1] == ""): # the substring is ""
+                    pass
 
-        asm.write("segment .bss\n")
-        asm.write("mem: resb %d\n" % MEMORY_SIZE)
+            asm.write("    " + str_label + ": db " + str_data + "\n")
+            asm.write("    " + str_label + "_len: equ $ - " + str_label + "\n")
+
+        asm.write("segment .bss\n")                 # .bss section
+        asm.write("    mem: resb %d\n" % MEMORY_SIZE)
 
 
 def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
@@ -503,7 +519,7 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
     return program, required_labels
 
 
-def parse_tokens(tokens):
+def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
     program = []
     for token in tokens:
         token_loc = token[0] 
@@ -594,6 +610,8 @@ def parse_tokens(tokens):
             program.append((token_loc, Builtin.OP_ENDIF))
         elif token_value == "syscall":
             program.append((token_loc, Builtin.OP_SYSCALL))
+        elif token_value[0] == "\"":
+            program.append((token_loc, Builtin.OP_PUSH_STR, token_value))
         else:
             try:
                 program.append((token_loc, Builtin.OP_PUSH_INT, int(token_value)))
@@ -609,6 +627,8 @@ def parse_tokens(tokens):
 def load_tokens(file_path):
     tokens = []
     token = ""
+    line_loc = 0
+    column_loc = 0
     with open(file_path, "r") as input_file:
         for line in list(enumerate(input_file)):
             line = (line[0], line[1].split(";", 1)[0]) # single line comment handling
@@ -634,8 +654,12 @@ def load_tokens(file_path):
                     token = ""
                 
     if Debug == 3:
-        print("tokens:", tokens, "\n")    
-    return tokens
+        print("tokens:", tokens, "\n")
+
+    if tokens == []:
+        print_compilation_error(((file_path, line_loc, column_loc), None), "ERROR no tokens found")
+        exit(1)
+    return tokens   # tokens = [ ... , (token_loc, token), ... ]
 
 
 def run_cmd(cmd):
