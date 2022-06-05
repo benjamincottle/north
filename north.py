@@ -111,7 +111,7 @@ op_readable = {
 def print_compilation_error(token, error_msg):   # (token_loc, token_type, token_value), "string"
     token_loc = token[0]
     with open(token_loc[0], "r") as input_file:
-        input_line = (''.join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
+        input_line = ("".join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
         if input_line[-1:] != "\n":
             input_line += "\n"
         print(input_line, end="")
@@ -417,7 +417,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
         asm.write("section .rodata\n")              # .ro_data section
         for string in list(enumerate(ro_data)):
             str_label = "str%d" % (string[0])
-            string = bytes(string[1][1:-1], "utf-8").decode('unicode-escape').split("\n")
+            string = bytes(string[1][1:-1], "utf-8").decode("unicode-escape").split("\n")
             str_data = ""
             for substring in list(enumerate(string)): #[(0, 'Hello World!'), (1, 'more str'), (2, '')]
                 if ((substring[0] == 0) and (not((substring[0] == (len(string) - 1))))): # the first substring but not the last
@@ -426,14 +426,13 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     str_data += "\"" + substring[1] + "\""
                 elif (not (substring[0] == 0)) and (not (substring[0] == (len(string) - 1))): # not the first or the last substring
                     str_data += ", \"" + substring[1] + "\"" + ", 10"
-                elif (  (substring[0] == (len(string) - 1)) and (not substring[1] == "") ):  # the last substring and it's not ""
+                elif ((substring[0] == (len(string) - 1)) and (not substring[1] == "")):  # the last substring and it's not ""
                     str_data += ", \"" + substring[1] + "\""
                 elif (substring[1] == ""): # the substring is ""
                     pass
 
             asm.write("    " + str_label + ": db " + str_data + "\n")
             asm.write("    " + str_label + "_len: equ $ - " + str_label + "\n")
-
         asm.write("segment .bss\n")                 # .bss section
         asm.write("    mem: resb %d\n" % MEMORY_SIZE)
 
@@ -612,6 +611,8 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
             program.append((token_loc, Builtin.OP_SYSCALL))
         elif token_value[0] == "\"":
             program.append((token_loc, Builtin.OP_PUSH_STR, token_value))
+        elif token_value[0] == "\'":
+            program.append((token_loc, Builtin.OP_PUSH_INT, ord(bytes(token_value[1:-1], "utf-8").decode("unicode-escape"))))
         else:
             try:
                 program.append((token_loc, Builtin.OP_PUSH_INT, int(token_value)))
@@ -626,40 +627,74 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
 
 def load_tokens(file_path):
     tokens = []
-    token = ""
-    line_loc = 0
-    column_loc = 0
-    with open(file_path, "r") as input_file:
-        for line in list(enumerate(input_file)):
-            line = (line[0], line[1].split(";", 1)[0]) # single line comment handling
+    with open(file_path, "r", encoding="utf-8") as input_file:  
+        for line in list(enumerate(input_file)): # (..., (0, ('./tests/character_literals.north', 0, 0), (1, ('"\\n"')) ), ...)
+            token = ""
+            end_marker = ""
+            line_loc = 0
+            column_loc = 0
+            line = (line[0], line[1].split(";", 1)[0] + "\n")    # single line comment handling
+            # line = (line[0], line[1].split(";", 1)[0])    # single line comment handling
             line_loc = line[0]
-            for column in list(enumerate(line[1])):
-                if ((column[1].isspace()) and (token.count("\"") == 2)):
-                    if (not (token == "")):
-                        tokens.append( ((input_file.name, line_loc, column_loc), token) )
-                    token = ""  
-                elif ((column[1].isspace()) and (token.count("\"") == 1)):
-                    token += column[1]
-                elif (not (column[1].isspace())):
-                    if (token == ""):
+            for column in list(enumerate(line[1])):# (..., (0, ('\n')), ...)
+                if (token == ""):            # Find the beginning of the token
+                    if (column[1] == "\""):  # this is a string literal token end = ´"´
                         column_loc = column[0]
-                    token += column[1]
-                    if (column[0] == (len(line[1]) - 1)): # no newline at end of file
-                        if (not (token == "")):
-                            tokens.append( ((input_file.name, line_loc, column_loc), token) )
-                        token = ""                        
-                else:
-                    if (not (token == "")):
+                        end_marker = "\""
+                        token += column[1] 
+                    elif (column[1] == "\'"):  # this is a character literal token end = ´'´
+                        column_loc = column[0]
+                        end_marker = "\'"
+                        token += column[1]
+                    elif (not column[1].isspace()):  # this is a number or a word, don't set end_marker
+                        column_loc = column[0]
+                        token += column[1]
+                else:                        # Find the end of the token  
+                    if ((column[0] == len(line[1]) - 1) and ((token.count("\"") == 1) or (token.count("\'") == 1))):
+                        try:
+                            assert (end_marker == "")
+                        except AssertionError as e:
+                            if (token[-1:] == "\n"):
+                                token = token[:-1]
+                            token_type = "string" if (end_marker == "\"") else "character"
+                            print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR invalid %s literal `%s`" % (token_type, token))
+                            exit(1)
+
+                    elif ((column[1] == "\"")  and  (end_marker == "\"")):  # this is the closing mark of a string literal
+                        token += column[1] 
+                        tokens.append(((input_file.name, line_loc, column_loc), token))
+                        token = ""
+                        end_marker = ""
+                    elif (((column[1] == "\n") or (column[1] == " "))  and  (not end_marker == "")):  # newline and space inside of string literal should be added to string and character literals
+                        token += column[1] 
+                    elif (column[1] == "\'") and (end_marker == "\'"):  # this is the closing mark of a character literal
+                        token += column[1]
+                        if (len(token) == 2):
+                            token = "0"
+                        try:
+                            assert len(bytes(token, "utf-8").decode("unicode-escape")) <= 3
+                        except AssertionError as e:
+                            print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR invalid character literal `%s`" % token)
+                            exit(1)
+
+                        tokens.append(((input_file.name, line_loc, column_loc), token))
+                        token = ""
+                        end_marker = ""
+                    elif ((column[1].isspace()) or (column[0] == len(line[1]) - 1)):  # this is the end marker of number or a word, end = space or newline or last position in the line
                         tokens.append( ((input_file.name, line_loc, column_loc), token) )
-                    token = ""
-                
+                        token = ""
+
+                    else:
+                        token += column[1]
+
     if Debug == 3:
         print("tokens:", tokens, "\n")
-
+    
     if tokens == []:
         print_compilation_error(((file_path, line_loc, column_loc), None), "ERROR no tokens found")
         exit(1)
-    return tokens   # tokens = [ ... , (token_loc, token), ... ]
+
+    return tokens   # tokens = [ ... , (token_loc, token), ... ]        
 
 
 def run_cmd(cmd):
@@ -669,8 +704,8 @@ def run_cmd(cmd):
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(add_help=False, description='north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.')
-    arg_parser.add_argument('-h', action='help', default=argparse.SUPPRESS, help='Show this help message and exit.')
+    arg_parser = argparse.ArgumentParser(add_help=False, description="north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.")
+    arg_parser.add_argument("-h", action="help", default=argparse.SUPPRESS, help="Show this help message and exit.")
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
     arg_parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
