@@ -6,7 +6,7 @@ from pathlib import Path
 
 
 # TODO:
-# Or, And, Not, Syscalls, character literals, etc.
+# Or, And, Not, Syscalls, etc.
 
 Debug = 0
 MEMORY_SIZE = 128000
@@ -634,7 +634,6 @@ def load_tokens(file_path):
             line_loc = 0
             column_loc = 0
             line = (line[0], line[1].split(";", 1)[0] + "\n")    # single line comment handling
-            # line = (line[0], line[1].split(";", 1)[0])    # single line comment handling
             line_loc = line[0]
             for column in list(enumerate(line[1])):# (..., (0, ('\n')), ...)
                 if (token == ""):            # Find the beginning of the token
