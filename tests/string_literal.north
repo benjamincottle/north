@@ -1,3 +1,19 @@
+;""                          ; valid
+;"\n"                        ; valid
+;"\n\n"                      ; valid
+;"'"                         ; valid
+;"abc"                       ; valid
+;"abc\n"                     ; valid
+;"ab\nc"                     ; valid
+;"abc\n\n"                   ; valid
+
+;"string                     ; invalid   ERROR invalid string literal `"string`
+;"""                         ; invalid   ERROR tokens should be separated by whitespace
+;"abc""def"                  ; invalid   ERROR tokens should be separated by whitespace
+;"abc"1 1 syscall drop       ; invalid   ERROR tokens should be separated by whitespace
+;"halløj\n" 1 1 syscall      ; broken    outputs hallÃ¸j
+
+; notes
 ;count *buf fd 1 syscall
 ; "string" 1 1 syscall
 ; will: push str_len
@@ -7,20 +23,18 @@
 ; the syscall consumes 4 args and the return code (number of bytes written) is pushed to the stack
 ; supports \n newline char inline
 
- 
 
-;"Hello "World!\n" ; marked as invalid because of ´World!\n"´
-"" 1 1 syscall drop  ; not working
-"\n" 1 1 syscall drop ; not working
-"\nHello" 1 1 syscall drop
-"Hello" 1 1 syscall drop
+ "" 1 1 syscall drop
+   "\n" 1 1 syscall drop ; not working
+ "\nHello" 1 1 syscall drop
+   "Hello" 1 1 syscall drop
 "Hello World!" 1 1 syscall drop
-"Hello World!\n" 1 1 syscall drop
+ "Hello World!\n" 1 1 syscall drop
 "   Hello World!\n" 1 1 syscall drop
 "Hello World!\n\n" 1 1 syscall drop
 "Hello World!\nMore String\n" 1 1 syscall drop
-"Hello World!\n""Hello World!\n" 1 1 syscall drop 1 1 syscall drop
-"Hello World!"1 1 syscall drop
+
+
 
 ;$ ./output
 ;
@@ -31,8 +45,6 @@
 ;
 ;Hello World!
 ;More String
-;Hello World!
-;Hello World!
-;Hello World!$
+;$
 
 

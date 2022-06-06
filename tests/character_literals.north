@@ -1,23 +1,24 @@
- '';
- '\n' ; comment
- ' ' ; comment
- 'a' ;
- 'a''b' ;
- 'A'store8 ;
+;''                  ; valid
+;'\n'                ; valid
+;' '                 ; valid
+;'a'                 ; valid
+;'"'                 ; valid
 
-; 'de'  ;invalid
-; ''' ; parsed as '' and '  , not valid 
-; 'a'storZZ ; invalid     
-
+;'a                  ; invalid   ERROR invalid character literal `'a`
+;mem 0 + 'a'store8   ; invalid   ERROR tokens should be separated by whitespace
+;'de'                ; invalid   ERROR invalid character literal `'de'`
+;'''                 ; invalid   ERROR tokens should be separated by whitespace
+;'a'storZZ           ; invalid   ERROR tokens should be separated by whitespace
+;'a''b'              ; invalid   ERROR tokens should be separated by whitespace
 
 ;working
-;mem 0 + 'a' store8
-;mem 1 + '' store8
-;mem 2 + 'b' store8
-;mem 3 + ' ' store8
-;mem 4 + 'c' store8
-;mem 5 + '\n' store8
-;6 mem 1 1 syscall drop
+mem 0 + 'a' store8
+mem 1 + '' store8
+mem 2 + 'b' store8
+mem 3 + ' ' store8
+mem 4 + 'c' store8
+mem 5 + '\n' store8
+6 mem 1 1 syscall drop
 
 
 ; test if nasm supports \n

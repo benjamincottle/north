@@ -1,0 +1,41 @@
+; >> (bitwise right shift)
+; << (bitwise left shift)
+; & (bitwise AND)
+; | (bitwise OR)
+; ~ (bitwise NOT)
+; ^ (bitwise XOR)
+; >>> (bitwise unsigned right shift) unimplemented
+
+; bitshift right   should print 4 2
+64 4 >> print
+8 2 >> print
+
+; bitshift left   should print 32 64
+2 4 << print
+1 6 << print
+
+; bitwise and
+;10 01 & -> 00  should print 0 7
+2 1 & print
+23 15 & print
+
+; bitwise or
+;10 01 | -> 11  should print 3 95
+2 1 | print
+72 23 | print
+
+; bitwise xor
+; should print 1 0 0 1 7341
+0 1 ^ print
+1 1 ^ print 
+0 0 ^ print
+1 0 ^ print
+7320 53 ^ print
+
+; bitwise not - not working
+0 ~ print   ; returning -1
+1 ~ print   ; returning -2
+
+
+
+

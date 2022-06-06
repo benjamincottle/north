@@ -5,9 +5,6 @@ import argparse
 from pathlib import Path
 
 
-# TODO:
-# Or, And, Not, Syscalls, etc.
-
 Debug = 0
 MEMORY_SIZE = 128000
 
@@ -51,6 +48,10 @@ class Builtin(Enum):
     OP_LE = auto()          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
     OP_LSHIFT = auto()      # (x, y) -> (z) Perform a logical left shift of y bit-places on x, giving z
     OP_RSHIFT = auto()      # (x, y) -> (z) Perform a logical right shift of y bit-places on x, giving z
+    OP_BITWISE_AND = auto()
+    OP_BITWISE_OR = auto()
+    OP_BITWISE_NOT = auto()
+    OP_XOR = auto()
     OP_WHILE = auto()
     OP_DO = auto()
     OP_DONE = auto()
@@ -58,7 +59,6 @@ class Builtin(Enum):
     OP_ELSE = auto()
     OP_ENDIF = auto()
     OP_SYSCALL = auto()
-    
 
 
 op_readable = {
@@ -96,6 +96,10 @@ op_readable = {
     "OP_GE": "<=",
     "OP_LT": "<",
     "OP_LE": "<=",
+    "OP_BITWISE_AND": "&",
+    "OP_BITWISE_OR": "|",
+    "OP_BITWISE_NOT": "~",
+    "OP_XOR": "^",
     "OP_LSHIFT": "<<",
     "OP_RSHIFT": ">>",
     "OP_WHILE": "while",
@@ -371,6 +375,25 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 asm.write("    pop     rax\n")
                 asm.write("    shr     rax, cl\n")
                 asm.write("    push    rax\n")
+            elif token_type == Builtin.OP_BITWISE_AND:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    and     rax, rbx\n")
+                asm.write("    push    rax\n")                
+            elif token_type == Builtin.OP_BITWISE_OR:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    or     rax, rbx\n")
+                asm.write("    push    rax\n")   
+            elif token_type == Builtin.OP_BITWISE_NOT:
+                asm.write("    pop     rax\n")
+                asm.write("    not     rax\n")
+                asm.write("    push    rax\n")   
+            elif token_type == Builtin.OP_XOR:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    xor     rax, rbx\n")
+                asm.write("    push    rax\n")
             elif token_type == Builtin.OP_WHILE:
                 pass
             elif token_type == Builtin.OP_DO:
@@ -387,6 +410,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 asm.write("    jmp     .L%d\n" % (op[1][2]))
             elif token_type == Builtin.OP_ENDIF:
                 pass        
+            # TODO: Support syscalls other than 0, 1, 2
             elif token_type == Builtin.OP_SYSCALL:
                 if op[1][2] in [0, 1, 2]:
                     asm.write("    pop     rax\n")
@@ -419,7 +443,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
             str_label = "str%d" % (string[0])
             string = bytes(string[1][1:-1], "utf-8").decode("unicode-escape").split("\n")
             str_data = ""
-            for substring in list(enumerate(string)): #[(0, 'Hello World!'), (1, 'more str'), (2, '')]
+            for substring in list(enumerate(string)): #[(0, 'Hello World!'), (1, 'more str'), (2, '')] -> "Hello World!", 10, "More String", 10
                 if ((substring[0] == 0) and (not((substring[0] == (len(string) - 1))))): # the first substring but not the last
                     str_data += "\"" + substring[1] + "\"" + ", 10"
                 if ((substring[0] == 0) and (((substring[0] == (len(string) - 1))))): # the first and last substring
@@ -595,6 +619,14 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
             program.append((token_loc, Builtin.OP_LSHIFT))
         elif token_value == ">>":
             program.append((token_loc, Builtin.OP_RSHIFT))
+        elif token_value == "&":
+            program.append((token_loc, Builtin.OP_BITWISE_AND))            
+        elif token_value == "|":
+            program.append((token_loc, Builtin.OP_BITWISE_OR))            
+        elif token_value == "~":
+            program.append((token_loc, Builtin.OP_BITWISE_NOT))            
+        elif token_value == "^":
+            program.append((token_loc, Builtin.OP_XOR)) 
         elif token_value == "while":
             program.append((token_loc, Builtin.OP_WHILE))
         elif token_value == "do":
@@ -630,43 +662,44 @@ def load_tokens(file_path):
     with open(file_path, "r", encoding="utf-8") as input_file:  
         for line in list(enumerate(input_file)): # (..., (0, ('./tests/character_literals.north', 0, 0), (1, ('"\\n"')) ), ...)
             token = ""
-            end_marker = ""
+            end_mark = ""
             line_loc = 0
             column_loc = 0
             line = (line[0], line[1].split(";", 1)[0] + "\n")    # single line comment handling
             line_loc = line[0]
             for column in list(enumerate(line[1])):# (..., (0, ('\n')), ...)
-                if (token == ""):            # Find the beginning of the token
-                    if (column[1] == "\""):  # this is a string literal token end = ´"´
+                if (token == ""):                    # Looking for beginning of the next token
+                    if ((column[1] == "\"") or (column[1] == "\'") or (not column[1].isspace())):  # this is the start of a string/character literal token_end = ´"´ or ´'´
                         column_loc = column[0]
-                        end_marker = "\""
-                        token += column[1] 
-                    elif (column[1] == "\'"):  # this is a character literal token end = ´'´
-                        column_loc = column[0]
-                        end_marker = "\'"
-                        token += column[1]
-                    elif (not column[1].isspace()):  # this is a number or a word, don't set end_marker
-                        column_loc = column[0]
-                        token += column[1]
-                else:                        # Find the end of the token  
-                    if ((column[0] == len(line[1]) - 1) and ((token.count("\"") == 1) or (token.count("\'") == 1))):
+                        token += column[1]                       
+                        if ((column[1] == "\"") or (column[1] == "\'")):
+                            end_mark = column[1]
+                        if (not (column[0] == 0)):  # not the beginning of the line
+                            try:
+                                assert (line[1][column[0] - 1] == " ") # the previous char must be space, i.e. "abc""def" and 'a''b' not supported
+                            except AssertionError as e:
+                                token_type = "string" if (end_mark == "\"") else "character"
+                                print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR tokens should be separated by whitespace")
+                                exit(1)
+
+                else:                                # We're building a token, find the end
+                    if ((column[0] == len(line[1]) - 1) and ((token.count("\"") == 1) or (token.count("\'") == 1))):  # end of line and there's only one ´"´ or ´'´ in the token
                         try:
-                            assert (end_marker == "")
+                            assert (end_mark == "")
                         except AssertionError as e:
                             if (token[-1:] == "\n"):
                                 token = token[:-1]
-                            token_type = "string" if (end_marker == "\"") else "character"
+                            token_type = "string" if (end_mark == "\"") else "character"
                             print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR invalid %s literal `%s`" % (token_type, token))
                             exit(1)
-
-                    elif ((column[1] == "\"")  and  (end_marker == "\"")):  # this is the closing mark of a string literal
+                    elif (((column[1] == "\n") or (column[1] == " "))  and  (not end_mark == "")):  # newline and space inside of string literal should be added to string and character literals
+                        token += column[1] 
+                    elif ((column[1] == "\"")  and  (end_mark == "\"")):  # this is the closing mark of a string literal
                         token += column[1] 
                         tokens.append(((input_file.name, line_loc, column_loc), token))
                         token = ""
-                        end_marker = ""
-                    elif (((column[1] == "\n") or (column[1] == " "))  and  (not end_marker == "")):  # newline and space inside of string literal should be added to string and character literals
-                        token += column[1] 
-                    elif (column[1] == "\'") and (end_marker == "\'"):  # this is the closing mark of a character literal
+                        end_mark = ""
+                    elif (column[1] == "\'") and (end_mark == "\'"):  # this is the end_mark of a character literal
                         token += column[1]
                         if (len(token) == 2):
                             token = "0"
@@ -678,12 +711,11 @@ def load_tokens(file_path):
 
                         tokens.append(((input_file.name, line_loc, column_loc), token))
                         token = ""
-                        end_marker = ""
-                    elif ((column[1].isspace()) or (column[0] == len(line[1]) - 1)):  # this is the end marker of number or a word, end = space or newline or last position in the line
+                        end_mark = ""
+                    elif ((column[1].isspace()) or (column[0] == len(line[1]) - 1)):  # this is the end_mark of number or a word, end = space or newline or last position in the line
                         tokens.append( ((input_file.name, line_loc, column_loc), token) )
                         token = ""
-
-                    else:
+                    else:        # continue building token
                         token += column[1]
 
     if Debug == 3:

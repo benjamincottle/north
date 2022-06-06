@@ -1,18 +1,21 @@
+41 41 == 41 42 == * print    ; here * is logical and
+41 41 == 42 42 == * print    ; here * is logical and
+84 print
 41 42 == print
 41 41 == print
 
 41 41 != print
 41 42 != print
-88 print
+85 print
 41 42 != print
 42 41 != print
-88 print
+86 print
 41 42 > print
 42 41 > print
 
 42 41 < print
 41 42 < print
-88 print
+87 print
 41 42 >= print
 42 41 >= print
 42 42 >= print
@@ -20,3 +23,19 @@
 42 41 <= print
 41 42 <= print
 42 42 <= print
+
+;logical and
+;1 1 1
+;0 1 0
+;1 0 0
+;0 0 0 
+
+;logical or
+;1 1 1
+;0 1 1
+;1 0 1
+;0 0 0 
+
+;logical not
+;1 0
+;0 1
