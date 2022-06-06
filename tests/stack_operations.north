@@ -1,0 +1,38 @@
+; <int>
+42 23
+
+; print
+42 print 23 print
+14 print
+
+; dup
+23 dup print print
+
+; 2dup
+12 23 2dup print print print print
+
+; drop
+23 42 drop print
+
+; 2drop
+12 23 42 2drop print
+
+; over
+12 23 42 over print
+
+; 2over
+10 12 23 42 2over print print print print
+
+; swap
+12 23 swap print print
+
+; 2swap
+12 23 42 126 2swap print print print print
+
+; rot
+1 2 3 rot print print print
+
+; dupnz
+14 2 1 dupnz print print print print
+14 2 0 dupnz print print print
+

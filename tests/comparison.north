@@ -1,28 +1,41 @@
-41 41 == 41 42 == * print    ; here * is logical and
-41 41 == 42 42 == * print    ; here * is logical and
-84 print
+; =
 41 42 == print
 41 41 == print
 
+; !=
 41 41 != print
 41 42 != print
-85 print
-41 42 != print
-42 41 != print
-86 print
+
+; >
 41 42 > print
 42 41 > print
 
+; <
 42 41 < print
 41 42 < print
-87 print
+
+; >=
 41 42 >= print
 42 41 >= print
 42 42 >= print
-88 print
+
+; <=
 42 41 <= print
 41 42 <= print
 42 42 <= print
+
+; min
+1 2 min print
+2 1 min print
+
+; max
+1 2 max print
+2 1 max print
+
+; here * is logical and
+41 41 == 41 42 == * print    
+41 41 == 42 42 == * print
+
 
 ;logical and
 ;1 1 1

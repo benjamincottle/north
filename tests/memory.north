@@ -26,3 +26,4 @@ mem 3 + load32 print
 
 ; load 64bit int at mem[7] and push onto stack
 mem 7 + load64 print
+

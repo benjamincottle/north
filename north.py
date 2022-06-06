@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 import sys
 import subprocess
 from enum import Enum, auto
@@ -738,7 +740,7 @@ if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser(add_help=False, description="north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.")
     arg_parser.add_argument("-h", action="help", default=argparse.SUPPRESS, help="Show this help message and exit.")
     arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
-    arg_parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode.")
+    arg_parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode with increasing verbosity.")
     arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
     arg_parser.add_argument("-r", dest="exec_output", required=False, default=False, action="store_true", help="Additionally execute output on successful compilation.")
     arg_parser.add_argument("input_file", type=str, help="path to the input_file.")

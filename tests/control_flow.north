@@ -37,3 +37,20 @@ endif
 else          
     0 print
 endif
+
+
+5 while dup 0 > do
+  dup print
+  1 -
+done drop
+
+; a nested while loop!
+5 while dup 0 > do
+  dup print
+  3 while dup 0 > do
+    dup print
+    1 -
+  done drop
+  1 -
+done drop
+
