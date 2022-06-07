@@ -427,10 +427,12 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     except NotImplementedError as e:
                         print_compilation_error(op[1], "ERROR `syscall` %d is not implemented" % (op[1][2]))
                         exit(1)
+
             elif token_type == Builtin.OP_PUSH_STR:
-                ro_data.append(op[1][2])     # ro_data = [string1, string2, ...] str_label = len(ro_data) - 1
-                asm.write("    push    %s\n" % ("str" + str(len(ro_data) - 1) + "_len"))
-                asm.write("    push    %s\n" % ("str" + str(len(ro_data) - 1)))
+                if (not (op[1][2]) in ro_data):
+                    ro_data.append(op[1][2])
+                asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][2])) + "_len"))
+                asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][2]))))
 
             else:
                 assert False, "Unreachable"
