@@ -532,7 +532,8 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             required_labels.append(op_label + 1)
         elif (token_type == Builtin.OP_SYSCALL):
             program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value 
-
+        elif (token_type == Builtin.OP_DUPNZ):
+            required_labels.append(op_label + 1)
     try:
         assert block_stack == []  # block_stack is a list of indexes of left over tokens
     except AssertionError as e:
