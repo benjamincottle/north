@@ -1,0 +1,24 @@
+; prints out all command line args, argv[0], argv[1], argv[2], ...
+; expects stack: &argv[N] ... &argv[1] &argv[0] argc
+
+0 swap                                               ; set memoffset to 0
+while dup 0 > do                                     ; while argc > 0
+    rot while dup load8 dup 0 != do                  ; while we haven't reached the null byte
+        rot swap 2swap over
+        mem swap + 2swap rot rot store8              ; store char in mem at memoffset
+        1 +                                          ; increment memoffset
+        swap          
+        1 +                                          ; increment the ptr &argv[n]
+        swap rot rot
+    done drop                                        ; drop the null byte
+    10                                               ; a newline char
+    rot swap 2swap over
+    mem swap + 2swap rot rot store8                  ; store the newline in mem at memoffset 
+    1 +                                              ; increment memoffset
+    swap drop                                        ; drop the ptr &argv[n]                       
+    dup mem 1 1 syscall drop                         ; print the argv[n], drop syscall returncode
+    drop 0                                           ; set memoffset to 0
+    swap                                              
+    1 -                                              ; decrement argc
+done
+
