@@ -1,0 +1,26 @@
+; converts a string of digits to an integer
+; TODO: add basic checks
+"18446744073709551615"        ; str_len &str_ptr
+swap drop 0 swap              ; result &str_ptr
+; requires stack > result &str_ptr
+while dup load8 dup 0 != do   ; while we haven't reached the null byte      ;stack > result &str_ptr str_ptr
+    48 -                      ; subtract 48 (man ascii)
+    rot
+    10 * +                    ; add it to result * 10
+    swap
+    1 +                       ; increment &str_ptr
+done 2drop                    ; drop the argv[x] and it's &argv[x] (null byte and the pointer to it)
+print                         ; prints result
+
+;{
+;	char string[] = "65527";
+;    int result = 0;
+;    int index = 0;
+;    while (string[index] != '\0' ) {
+;        result = result * 10 
+;        result = result + (string[index] - 48);
+;        index++;
+;    }
+;	
+;    printf("%d ", result);
+;}

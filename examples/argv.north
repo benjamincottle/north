@@ -9,7 +9,8 @@ while dup 0 > do                                     ; while argc > 0
         1 +                                          ; increment memoffset
         swap          
         1 +                                          ; increment the ptr &argv[n]
-        swap rot rot
+        rot swap                                     ; optimisation for line below could be suggested by the compiiler
+        ;swap rot rot
     done drop                                        ; drop the null byte
     10                                               ; a newline char
     rot swap 2swap over

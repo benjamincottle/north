@@ -1,23 +1,27 @@
+; syscall (read)
+; count *buf fd 0 syscall
+; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes read for syscall 0) is pushed back to the stack
+
+; remember read() doesn't add '\0' to terminate to make it string (just gives raw buffer).
+
 ; syscall (write)
 ; count *buf fd 1 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes written for syscall 1) is pushed back to the stack
-mem 0 + 72 store8
-mem 1 + 101 store8
-mem 2 + 108 store8
-mem 3 + 108 store8
-mem 4 + 111 store8
-mem 5 + 32 store8
-mem 6 + 74 store8
-mem 7 + 117 store8
-mem 8 + 108 store8
-mem 9 + 105 store8
-mem 10 + 101 store8
-mem 11 + 33 store8
-mem 12 + 33 store8
-mem 13 + 33 store8
-mem 14 + 10 store8
-15 mem 1 1 syscall
 
-; exit
-23 exit
 
+; syscall (exit_group)
+; exitcode exit
+; exits the program with ´exitcode´ using ´syscall´ 231
+
+; reading a byte from stdin
+1 mem 1 0 syscall drop
+
+; writing it to stdout
+mem 72 store8
+1 mem 1 1 syscall
+
+; or more simply:
+"Hello World!\n" 1 1 syscall drop
+
+; exit with exit code 0
+0 exit
