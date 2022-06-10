@@ -1,17 +1,22 @@
-; syscall (read)
+; linux system calls
+;
+; linux system calls are of the general form:
+; arg5 arg4 arg3 arg2 arg1 syscall_number syscall
+; these correspond to the arguments in arg0 (%rdi) arg1 (%rsi) arg2 (%rdx) arg3 (%r10) arg4 (%r8) arg5 (%r9)
+; not all arguments are required for each syscall
+
+; syscall 0 (read)
 ; count *buf fd 0 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes read for syscall 0) is pushed back to the stack
-
 ; remember read() doesn't add '\0' to terminate to make it string (just gives raw buffer).
 
-; syscall (write)
+; syscall 1 (write)
 ; count *buf fd 1 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes written for syscall 1) is pushed back to the stack
 
-
-; syscall (exit_group)
-; exitcode exit
-; exits the program with ´exitcode´ using ´syscall´ 231
+; syscall 231 (exit_group)
+; exitcode 231 syscall
+; the ´syscall´ token consumes 2 args from the stack, exits the program with ´exitcode´, does not return
 
 ; reading a byte from stdin
 1 mem 1 0 syscall drop
@@ -24,4 +29,7 @@ mem 72 store8
 "Hello World!\n" 1 1 syscall drop
 
 ; exit with exit code 0
+0 231 syscall
+
+; or more simply:
 0 exit

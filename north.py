@@ -10,6 +10,7 @@ from pathlib import Path
 Debug = 0
 MEMORY_SIZE = 128000
 
+# TODO: if ´syscall´ is preceeded with anything other than a number it will crash the compiler
 
 class Builtin(Enum):
     OP_PUSH_INT = auto()    # push int onto stack
@@ -414,11 +415,18 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 pass        
             # TODO: Support syscalls other than 0, 1, 2
             elif token_type == Builtin.OP_SYSCALL:
-                if op[1][2] in [0, 1, 2]:
+                # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx)
+                if op[1][2] in [0, 1, 2, 7, 8, 10, 16, 19, 20, 26, 27, 28, 29, 30, 31, 38, 41, 42, 43, 46, 47, 49, 51, 52, 59, 64, 65, 71, 72, 78, 89, 92, 93, 94, 103, 117, 118, 119, 120, 129, 133, 139, 141, 144, 173, 175, 187, 194, 195, 196, 203, 204, 209, 210, 212, 217, 222, 234, 238, 245, 251, 254, 258, 261, 263, 266, 268, 269, 274, 282, 292, 304, 309, 313, 314, 317, 318, 321, 324, 325]:
                     asm.write("    pop     rax\n")
                     asm.write("    pop     rdi\n")
                     asm.write("    pop     rsi\n")
                     asm.write("    pop     rdx\n")
+                    asm.write("    syscall\n")
+                    asm.write("    push     rax\n")
+                # These are Linux syscalls that utilise arg0 (%rdi)
+                elif op[1][2] in [3, 12, 22, 32, 37, 60, 63, 67, 74, 75, 80, 81, 84, 87, 95, 99, 100, 105, 106, 121, 122, 123, 124, 134, 135, 145, 146, 147, 151, 159, 161, 163, 168, 201, 207, 213, 218, 225, 226, 231, 241, 272, 284, 291, 294, 306, 323, 331]:
+                    asm.write("    pop     rax\n")
+                    asm.write("    pop     rdi\n")
                     asm.write("    syscall\n")
                     asm.write("    push     rax\n")
                 else:
@@ -531,7 +539,7 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
             program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
         elif (token_type == Builtin.OP_SYSCALL):
-            program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value 
+            program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value (syscall number)
         elif (token_type == Builtin.OP_DUPNZ):
             required_labels.append(op_label + 1)
     try:
