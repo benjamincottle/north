@@ -10,7 +10,7 @@ from pathlib import Path
 Debug = 0
 MEMORY_SIZE = 128000
 
-# TODO: if ´syscall´ is preceeded with anything other than a number it will crash the compiler
+
 
 class Builtin(Enum):
     OP_PUSH_INT = auto()    # push int onto stack
@@ -444,6 +444,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
             elif token_type == Builtin.OP_ENDIF:
                 pass        
             elif token_type == Builtin.OP_SYSCALL:
+                # TODO: Support all syscalls
                 # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx)
                 if op[1][2] in [0, 1, 2, 7, 8, 10, 16, 19, 20, 26, 27, 28, 29, 30, 31, 38, 41, 42, 43, 46, 47, 49, 51, 52, 59, 64, 65, 71, 72, 78, 89, 92, 93, 94, 103, 117, 118, 119, 120, 129, 133, 139, 141, 144, 173, 175, 187, 194, 195, 196, 203, 204, 209, 210, 212, 217, 222, 234, 238, 245, 251, 254, 258, 261, 263, 266, 268, 269, 274, 282, 292, 304, 309, 313, 314, 317, 318, 321, 324, 325]:
                     asm.write("    pop     rax\n")
@@ -462,7 +463,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                     try:
                         raise NotImplementedError()
                     except NotImplementedError as e:
-                        print_compilation_error(op[1], "ERROR `syscall` %d is not implemented" % (op[1][2]))
+                        print_compilation_error(program[op[0] - 1], "ERROR `%d syscall` is not implemented" % (op[1][2]))
                         exit(1)
 
             elif token_type == Builtin.OP_PUSH_STR:
@@ -554,7 +555,14 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
+        # TODO: should check that `program[op_label - 1][2]` is a supported syscall number
+        #       not just a valid integer that exists in the token_value
         elif (token_type == Builtin.OP_SYSCALL):
+            try:
+                int(program[op_label - 1][2])    #TODO: better check for if valid syscall
+            except (IndexError, ValueError) as e:
+                print_compilation_error(program[op_label - 1], "ERROR invalid syscall number `%s`" % op_readable[program[op_label - 1][1].name])
+                exit(1)
             program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value (syscall number)
         elif (token_type == Builtin.OP_DUPNZ):
             required_labels.append(op_label + 1)
