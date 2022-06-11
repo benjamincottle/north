@@ -1,0 +1,2 @@
+#include "tests/memory.north"
+88 print

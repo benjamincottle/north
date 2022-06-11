@@ -11,7 +11,6 @@ Debug = 0
 MEMORY_SIZE = 128000
 
 
-
 class Builtin(Enum):
     OP_PUSH_INT = auto()    # push int onto stack
     OP_PUSH_STR = auto()    # push str_size and &str onto stack
@@ -132,7 +131,7 @@ def print_compilation_error(token, error_msg):   # (token_loc, token_type, token
         print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg))
 
 
-def translate_to_elf64_asm(program, required_labels, output_file): # program = [ ... , (token_loc, token_type, token_value), ... ]
+def compile_to_elf64_asm(program, required_labels, output_file): # program = [ ... , (token_loc, token_type, token_value), ... ]
     with open(output_file, "w") as asm:
         ro_data = []
         asm.write("BITS 64\n")
@@ -559,7 +558,7 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         #       not just a valid integer that exists in the token_value
         elif (token_type == Builtin.OP_SYSCALL):
             try:
-                int(program[op_label - 1][2])    #TODO: better check for if valid syscall
+                int(program[op_label - 1][2])
             except (IndexError, ValueError) as e:
                 print_compilation_error(program[op_label - 1], "ERROR invalid syscall number `%s`" % op_readable[program[op_label - 1][1].name])
                 exit(1)
@@ -699,6 +698,26 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
 
     return program
 
+# TODO: Check for infinite loops, self inclusion etc. Include guards?
+def preprocessor_include(tokens):  # tokens = [ ... , (token_loc, token_val), ... ]
+    tokens_expanded = []
+    token_index = 0
+    while token_index < len(tokens):
+        token_val = tokens[token_index][1]
+        if token_val == "#include":
+            include_file = tokens[token_index + 1][1][1:-1]
+            tokens.remove(tokens[token_index + 1])
+            for token in preprocessor_include(load_tokens(include_file)):
+                tokens_expanded.append(token)
+        else:
+            tokens_expanded.append(tokens[token_index])
+        token_index += 1
+
+    if Debug == 3:
+        print("tokens_2:", tokens_expanded, "\n")
+
+    return tokens_expanded
+
 
 def load_tokens(file_path):
     tokens = []
@@ -762,7 +781,7 @@ def load_tokens(file_path):
                         token += column[1]
 
     if Debug == 3:
-        print("tokens:", tokens, "\n")
+        print("tokens_1:", tokens, "\n")
     
     if tokens == []:
         print_compilation_error(((file_path, line_loc, column_loc), None), "ERROR no tokens found")
@@ -811,8 +830,9 @@ if __name__ == "__main__":
         cleanup_command.remove(asm_file)
 
     tokens = load_tokens(input_file)
-    program, required_labels = locate_blocks(parse_tokens(tokens))
-    translate_to_elf64_asm(program, required_labels, asm_file)
+    tokens_included = preprocessor_include(tokens)
+    program, required_labels = locate_blocks(parse_tokens(tokens_included))
+    compile_to_elf64_asm(program, required_labels, asm_file)
     run_cmd(nasm_command)
     run_cmd(ld_command)
     
