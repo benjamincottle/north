@@ -1,7 +1,7 @@
 ; linux system calls
 ;
 ; linux system calls are of the general form:
-; arg5 arg4 arg3 arg2 arg1 syscall_number syscall
+; arg5 arg4 arg3 arg2 arg1 arg0 syscall_number syscall
 ; these correspond to the arguments in arg0 (%rdi) arg1 (%rsi) arg2 (%rdx) arg3 (%r10) arg4 (%r8) arg5 (%r9)
 ; not all arguments are required for each syscall
 
@@ -18,12 +18,21 @@
 ; exitcode 231 syscall
 ; the ´syscall´ token consumes 2 args from the stack, exits the program with ´exitcode´, does not return
 
+; syscall 2 (open)
+; mode flags *filename 2 syscall
+; the ´syscall´ token consumes 4 args from the stack and the return (fd for file) is pushed back to the stack
+
+; syscall 3 (close)
+; fd 3 syscall
+; the ´syscall´ token consumes 2 args from the stack and the return (0 for success, -1 for error) is pushed back to the stack
+
+
+
 ; reading a byte from stdin
 1 mem 1 0 syscall drop
 
 ; writing it to stdout
-mem 72 store8
-1 mem 1 1 syscall
+1 mem 1 1 syscall drop
 
 ; or more simply:
 "Hello World!\n" 1 1 syscall drop

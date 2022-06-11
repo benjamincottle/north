@@ -49,6 +49,9 @@ class Builtin(Enum):
     OP_GE = auto()          # (1, 2) -> (0) and (2, 1) -> (1) and (1, 1) -> (1) pop two items, push 1 if gte otherwise 0
     OP_LT = auto()          # (1, 2) -> (1) and (2, 1) -> (0) pop two items, push 1 if less, otherwise 0
     OP_LE = auto()          # (1, 2) -> (1) and (2, 1) -> (0) and (1, 1) -> (1) pop two items, push 1 if lte, otherwise 0
+    OP_LOGICAL_AND = auto() # 
+    OP_LOGICAL_OR = auto()  # 
+    OP_LOGICAL_NOT = auto() # 
     OP_LSHIFT = auto()      # (x, y) -> (z) Perform a logical left shift of y bit-places on x, giving z
     OP_RSHIFT = auto()      # (x, y) -> (z) Perform a logical right shift of y bit-places on x, giving z
     OP_BITWISE_AND = auto()
@@ -99,6 +102,9 @@ op_readable = {
     "OP_GE": "<=",
     "OP_LT": "<",
     "OP_LE": "<=",
+    "OP_LOGICAL_AND": "and",
+    "OP_LOGICAL_OR": "or",
+    "OP_LOGICAL_NOT": "not",
     "OP_BITWISE_AND": "&",
     "OP_BITWISE_OR": "|",
     "OP_BITWISE_NOT": "~",
@@ -193,7 +199,8 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    mul     rbx\n")
-                asm.write("    push    rax\n")    
+                asm.write("    push    rax\n")
+            # TODO: DIV can be optimised to MUL (https://repnz.github.io/posts/reversing-optimizations-division/)
             elif token_type == Builtin.OP_DIV:
                 asm.write("    mov     rdx, 0\n")
                 asm.write("    pop     rbx\n")
@@ -368,6 +375,27 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovle  rcx, rdx\n")
                 asm.write("    push    rcx\n")
+            elif token_type == Builtin.OP_LOGICAL_AND:
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    mul     rbx\n")
+                asm.write("    push    rax\n")
+            elif token_type == Builtin.OP_LOGICAL_OR:
+                asm.write("    mov     rcx, 0\n")
+                asm.write("    mov     rdx, 1\n")
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rbx\n")
+                asm.write("    add     rax, rbx\n")                
+                asm.write("    cmp     rax, 0\n")
+                asm.write("    cmovne  rcx, rdx\n")
+                asm.write("    push    rcx\n")
+            elif token_type == Builtin.OP_LOGICAL_NOT:
+                asm.write("    mov     rcx, 0\n")
+                asm.write("    mov     rdx, 1\n")
+                asm.write("    pop     rax\n")
+                asm.write("    cmp     rax, 0\n")
+                asm.write("    cmove  rcx, rdx\n")
+                asm.write("    push    rcx\n")
             elif token_type == Builtin.OP_LSHIFT:
                 asm.write("    pop     rcx\n")
                 asm.write("    pop     rax\n")
@@ -397,23 +425,24 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
                 asm.write("    pop     rbx\n")
                 asm.write("    xor     rax, rbx\n")
                 asm.write("    push    rax\n")
+            # Note: for condition checking in `do` and `if`, and for logical comparisons, 
+            # 0 is considered False, and not 0 is considered True
             elif token_type == Builtin.OP_WHILE:
                 pass
             elif token_type == Builtin.OP_DO:
                 asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 1\n")
-                asm.write("    jl      .L%d\n" % (op[1][2]))
+                asm.write("    cmp     rax, 0\n")
+                asm.write("    je      .L%d\n" % (op[1][2]))
             elif token_type == Builtin.OP_DONE:
                 asm.write("    jmp     .L%d\n" % (op[1][2]))
             elif token_type == Builtin.OP_IF:
                 asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 1\n")      
-                asm.write("    jl      .L%d\n" % (op[1][2]))
+                asm.write("    cmp     rax, 0\n")      
+                asm.write("    je      .L%d\n" % (op[1][2]))
             elif token_type == Builtin.OP_ELSE:
                 asm.write("    jmp     .L%d\n" % (op[1][2]))
             elif token_type == Builtin.OP_ENDIF:
                 pass        
-            # TODO: Support syscalls other than 0, 1, 2
             elif token_type == Builtin.OP_SYSCALL:
                 # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx)
                 if op[1][2] in [0, 1, 2, 7, 8, 10, 16, 19, 20, 26, 27, 28, 29, 30, 31, 38, 41, 42, 43, 46, 47, 49, 51, 52, 59, 64, 65, 71, 72, 78, 89, 92, 93, 94, 103, 117, 118, 119, 120, 129, 133, 139, 141, 144, 173, 175, 187, 194, 195, 196, 203, 204, 209, 210, 212, 217, 222, 234, 238, 245, 251, 254, 258, 261, 263, 266, 268, 269, 274, 282, 292, 304, 309, 313, 314, 317, 318, 321, 324, 325]:
@@ -628,6 +657,12 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
             program.append((token_loc, Builtin.OP_LT))
         elif token_value == "<=":
             program.append((token_loc, Builtin.OP_LE))
+        elif ((token_value == "and") or (token_value == "&&")):
+            program.append((token_loc, Builtin.OP_LOGICAL_AND))
+        elif ((token_value == "or") or (token_value == "||")):
+            program.append((token_loc, Builtin.OP_LOGICAL_OR))
+        elif ((token_value == "not") or (token_value == "!")):
+            program.append((token_loc, Builtin.OP_LOGICAL_NOT))
         elif token_value == "<<":
             program.append((token_loc, Builtin.OP_LSHIFT))
         elif token_value == ">>":
