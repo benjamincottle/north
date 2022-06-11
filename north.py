@@ -482,20 +482,7 @@ def translate_to_elf64_asm(program, required_labels, output_file): # program = [
         asm.write("section .rodata\n")              # .ro_data section
         for string in list(enumerate(ro_data)):
             str_label = "str%d" % (string[0])
-            string = bytes(string[1][1:-1], "utf-8").decode("unicode-escape").split("\n")
-            str_data = ""
-            for substring in list(enumerate(string)): #[(0, 'Hello World!'), (1, 'more str'), (2, '')] -> "Hello World!", 10, "More String", 10
-                if ((substring[0] == 0) and (not((substring[0] == (len(string) - 1))))): # the first substring but not the last
-                    str_data += "\"" + substring[1] + "\"" + ", 10"
-                if ((substring[0] == 0) and (((substring[0] == (len(string) - 1))))): # the first and last substring
-                    str_data += "\"" + substring[1] + "\""
-                elif (not (substring[0] == 0)) and (not (substring[0] == (len(string) - 1))): # not the first or the last substring
-                    str_data += ", \"" + substring[1] + "\"" + ", 10"
-                elif ((substring[0] == (len(string) - 1)) and (not substring[1] == "")):  # the last substring and it's not ""
-                    str_data += ", \"" + substring[1] + "\""
-                elif (substring[1] == ""): # the substring is ""
-                    pass
-
+            str_data = "`" + string[1][1:-1] + "`"    # nasm: Strings enclosed in backquotes support C-style -escapes for special characters.
             asm.write("    " + str_label + ": db " + str_data + "\n")
             asm.write("    " + str_label + "_len: equ $ - " + str_label + "\n")
         asm.write("segment .bss\n")                 # .bss section
