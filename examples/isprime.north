@@ -1,20 +1,14 @@
 ; starting stack: &argv[N] ... &argv[1] &argv[0] argc   
 
-dup 2 != if                       ; check if argc is != 2 (just one test candidate)
+dup 2 != if                        ; check if argc is != 2 (just one test candidate)
     ;TODO: unhardcode binary name
     "usage: ./isprime test_candidate\n" 1 1 syscall drop
     1 exit
 else
-    ;"argc = 2, go!\n" 1 1 syscall drop
-    2drop                         ; don't need argc or &argv[0] anymore
-    0 swap    ; setup the stack
-    ; requires stack > index result &str_ptr
-    while dup load8 dup 0 != do   ; while we haven't reached the null byte      ;stack > index result &str_ptr str_ptr
-        dup 57 > if               ; exit if not an digit                        ;stack > index result &str_ptr str_ptr
-            "candidate should be a positive integer\n" 1 1 syscall drop
-            1 exit
-        endif
-        dup 48 < if               ; exit if not an digit                        ;stack > index result &str_ptr str_ptr
+    2drop                          ; "argc = 2, don't need argc or &argv[0] anymore
+    0 swap                         ; setup thestack > index result &str_ptr
+    while dup load8 dup 0 != do    ; while we haven't reached the null byte  stack > index result &str_ptr str_ptr
+        dup 48 < over 57 > or if   ; check if we have an ascii char 0 - 9 
             "candidate should be a positive integer\n" 1 1 syscall drop
             1 exit
         endif
@@ -26,50 +20,28 @@ else
     done 
     drop rot 2drop                  ; optimisation for 2 lines below could be suggested by the compiiler
     ; drop drop                     ; drop the argv[x] and it's &argv[x] (null byte and the pointer to it)
-    ; swap drop                     ;stack > candidate
+    ; swap drop                     ; stack > candidate
 
     dup 4611686018427387904 > if
         "candidates <= 2^62 only sorry!\ntry 4611686018427387847, it's the biggest prime <= 2^62\n" 1 1 syscall drop    
         1 exit
-    endif
+    endif                     ;stack > candidate
 
-    dup 2 == if
-        "yes, 2 is a prime!\n" 1 1 syscall drop    
+    dup 2 == over 3 == or if
+        "yes, it's a prime!\n" 1 1 syscall drop    
         0 exit
     endif
 
-    dup 3 == if
-        "yes, 3 is a prime!\n" 1 1 syscall drop    
-        0 exit
-    endif
-
-    dup 1 <= if
+    dup 1 <= over 2 % 0 == or over 3 % 0 == or if
         "no, it's not a prime\n" 1 1 syscall drop    
         0 exit
     endif
-
-    dup 2 % 0 == if
-        "no, even numbers are not prime\n" 1 1 syscall drop    
-        0 exit
-    endif
-
-    dup 3 % 0 == if
-        "no, numbers divisible by 3 are not prime\n" 1 1 syscall drop    
-        0 exit
-    endif
-
-    ;expects stack > candidate
-    5 while 2dup dup * swap <= do 
-        2dup % 0 == if 
+                                                           ;expects stack > candidate
+    5 while 2dup dup * swap <= do                          ;stack> candidate i  
+        2dup 2dup % 0 == rot rot 2 + % 0 == or if
             "no, it's not a prime\n" 1 1 syscall drop    
             0 exit
         endif
-
-        2dup 2 + % 0 == if
-            "no, it's not a prime\n" 1 1 syscall drop    
-            0 exit
-        endif
-        
         6 +
     done
     over 
@@ -90,17 +62,12 @@ endif
 ;        return false;
 ;
 ;    int i = 5;
-;    while(i * i <= n) {             ; it would be better to check i <= √n 
-;        if ((n % i == 0)) {
-;            return false;
-;        }
-;
-;        if ((n % (i + 2) == 0)) {
+;    while (i * i <= n) {                      ; it would be better to check i <= √n 
+;        if (n % i == 0 || n % (i + 2) == 0) {
 ;            return false;
 ;        }
 ;        i +=6;
 ;    }
-;
 ;    return true;
 ;}
 
