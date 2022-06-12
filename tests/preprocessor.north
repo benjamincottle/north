@@ -1,4 +1,4 @@
-#include "tests/memory.north"
+#include "string_literal.north"
 88 print
 
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import os
+
 import pprint
 import argparse
 import subprocess
@@ -706,6 +706,13 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
         print("\n")
     return program
 
+# function to remove filename from path if present
+def remove_filename_from_path(path):
+    if path.find("/") == -1:
+        return path
+    else:
+        return path[:path.rfind("/")]
+
 
 def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc, token_val), ... ]
     try:
@@ -719,34 +726,51 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
         token_val = tokens[token_index][1]
         if token_val == "#include":
             try:     # Check for missing include_file 
-                assert (not (token_index + 1 >= len(tokens))), "ERROR `#include` missing include file"
+                assert (not (token_index + 1 >= len(tokens))) , "ERROR `#include` missing include file"
             except AssertionError as error_msg:
                 print_compilation_error(tokens[token_index], error_msg)
                 exit(1)
+
+            try:     # Check for valid include_file format
+                assert (((tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "\"\"") or ((tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "<>")) , "ERROR invalid `#include` file"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[token_index], error_msg)
+                exit(1)
+
             try:     # Can't include self 
                 assert (not (tokens[token_index + 1][1][1:-1] == tokens[token_index][0][0])), "ERROR `#include` can't include self"
             except AssertionError as error_msg:
                 print_compilation_error(tokens[token_index + 1], "error_msg")
                 exit(1)
+            include_file = tokens[token_index + 1][1][1:-1]
+            try:
+                assert include_file.find("/") == -1, "ERROR `#include` can not be a path. Additional search paths not implemented"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[token_index + 1], error_msg)
+                exit(1)
+            # TODO: implement -I for additonal search paths
+            # This is a local include
             if (tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "\"\"":
-                include_type = "local"
-                # TODO: setup filepath for include_file based on local include_type 
-                include_file_path = tokens[token_index + 1][1][1:-1]
+                parent_file = tokens[token_index][0][0]
+                if (not (parent_file.find("/") == -1)):
+                    search_path = parent_file[:parent_file.rfind("/")]
+                include_file_path = search_path + "/" + include_file
+            # This is a system include
             elif (tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "<>":
                 include_type = "system"
                 # TODO: setup filepath for include_file based on system include_type 
                 include_file_path = tokens[token_index + 1][1][1:-1]
+                assert False, "ERROR `#include` system includes not implemented"
             else:
                 print_compilation_error(tokens[token_index + 1], "ERROR invalid include `%s`" % tokens[token_index + 1][1])
                 exit(1)
-            try:
-                assert (os.path.isfile(include_file_path)), "ERROR include file `%s` not found" % include_file_path
+            try:  
+                assert (Path(include_file_path).is_file()), "ERROR include file `%s` not found" % include_file_path
             except AssertionError as error_msg:
                 print_compilation_error(tokens[token_index + 1], error_msg)
                 exit(1)              
             inc_token = tokens[token_index + 1]
             tokens.remove(tokens[token_index + 1])
-
             if (not (include_file_path in include_depth)):  # Don't include if we've seen this file before
                 include_depth.append(include_file_path)
                 for token in preprocessor_include(load_tokens(include_file_path), include_depth):
@@ -767,7 +791,7 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
 
 
 def load_tokens(file_path):
-    if not os.path.isfile(file_path):
+    if not Path(file_path).is_file():
         print("ERROR input file `%s` not found" % file_path)
         exit(1)
     tokens = []
