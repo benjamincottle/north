@@ -1,14 +1,16 @@
 #!/usr/bin/env python3
 
-import sys
-import subprocess
-from enum import Enum, auto
+import os
+import pprint
 import argparse
+import subprocess
 from pathlib import Path
+from enum import Enum, auto
 
 
 Debug = 0
 MEMORY_SIZE = 128000
+MAX_INCLUDE_DEPTH = 58
 
 
 class Builtin(Enum):
@@ -502,23 +504,23 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         elif (token_type == Builtin.OP_DONE):
             try:
                 do_loc = block_stack.pop()
-            except IndexError as e:
+            except IndexError as error_msg:
                 print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
-                assert program[do_loc][1] == Builtin.OP_DO
-            except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                assert program[do_loc][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+            except AssertionError as error_msg:
+                print_compilation_error(program[op_label], error_msg)
                 exit(1)
             try:
                 while_loc = block_stack.pop()
-            except IndexError as e:
+            except IndexError as error_msg:
                 print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
-                assert program[while_loc][1] == Builtin.OP_WHILE 
-            except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                assert program[while_loc][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+            except AssertionError as error_msg:
+                print_compilation_error(program[op_label], error_msg)
                 exit(1)
             program[do_loc] = (program[do_loc][0], program[do_loc][1], (op_label + 1)) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
@@ -529,13 +531,13 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         elif (token_type == Builtin.OP_ELSE):
             try:
                 if_loc = block_stack.pop()
-            except IndexError as e:
+            except IndexError as error_msg:
                 print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
-                assert program[if_loc][1] == Builtin.OP_IF 
-            except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                assert program[if_loc][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+            except AssertionError as error_msg:
+                print_compilation_error(program[op_label], error_msg)
                 exit(1)
             program[if_loc] = (program[if_loc][0], program[if_loc][1], (op_label + 1)) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
@@ -543,13 +545,13 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         elif (token_type == Builtin.OP_ENDIF):
             try:
                 if_or_else_loc = block_stack.pop()
-            except IndexError as e:
+            except IndexError as error_msg:
                 print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
                 exit(1)
             try:
-                assert (program[if_or_else_loc][1] == Builtin.OP_IF) or (program[if_or_else_loc][1] == Builtin.OP_ELSE), "`endif` missing matching `if` or `else` block"
-            except AssertionError as e:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                assert (program[if_or_else_loc][1] == Builtin.OP_IF) or (program[if_or_else_loc][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % op_readable[token_type.name]
+            except AssertionError as error_msg:
+                print_compilation_error(program[op_label], error_msg)
                 exit(1)
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], program[if_or_else_loc][1], (op_label + 1)) # if/else has (endif + 1) op's # as val
@@ -559,22 +561,25 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         elif (token_type == Builtin.OP_SYSCALL):
             try:
                 int(program[op_label - 1][2])
-            except (IndexError, ValueError) as e:
+            except (IndexError, ValueError) as error_msg:
                 print_compilation_error(program[op_label - 1], "ERROR invalid syscall number `%s`" % op_readable[program[op_label - 1][1].name])
                 exit(1)
             program[op_label] = (token_loc, token_type, program[op_label - 1][2]) # syscall has (syscall - 1) op's value as value (syscall number)
         elif (token_type == Builtin.OP_DUPNZ):
             required_labels.append(op_label + 1)
     try:
-        assert block_stack == []  # block_stack is a list of indexes of left over tokens
-    except AssertionError as e:
+        assert block_stack == [], "ERROR unmatched token `%s`" % op_readable[token_type.name]  # block_stack is a list of indexes of left over tokens
+    except AssertionError as error_msg:
         left_over_token = program[block_stack.pop()]
         token_type = left_over_token[1]
-        print_compilation_error(left_over_token, "ERROR unmatched token `%s`" % op_readable[token_type.name])
+        print_compilation_error(left_over_token, error_msg)
         exit(1)
 
     if Debug == 3:
-        print("program_2:", program, "\n")
+        print("DEBUG: locate_blocks:")
+        pp = pprint.PrettyPrinter(indent=4, width=120)
+        pp.pprint(program)
+        print("\n")
     return program, required_labels
 
 
@@ -683,43 +688,88 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
             program.append((token_loc, Builtin.OP_ENDIF))
         elif token_value == "syscall":
             program.append((token_loc, Builtin.OP_SYSCALL))
-        elif token_value[0] == "\"":
+        elif token_value[0] + token_value[-1] == "\"\"":
             program.append((token_loc, Builtin.OP_PUSH_STR, token_value))
-        elif token_value[0] == "\'":
+        elif token_value[0] + token_value[-1] == "\'\'":
             program.append((token_loc, Builtin.OP_PUSH_INT, ord(bytes(token_value[1:-1], "utf-8").decode("unicode-escape"))))
         else:
             try:
                 program.append((token_loc, Builtin.OP_PUSH_INT, int(token_value)))
-            except ValueError as e:
+            except ValueError as error_msg:
                 print_compilation_error(token, "ERROR invalid token `%s`" % token_value)
                 exit(1)
-    if Debug == 3:
-        print("program_1:", program, "\n")
 
+    if Debug == 3:
+        print("DEBUG: parse_tokens:")
+        pp = pprint.PrettyPrinter(indent=4, width=120)
+        pp.pprint(program)
+        print("\n")
     return program
 
-# TODO: Check for infinite loops, self inclusion etc. Include guards?
-def preprocessor_include(tokens):  # tokens = [ ... , (token_loc, token_val), ... ]
+
+def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc, token_val), ... ]
+    try:
+        assert len(include_depth) <= MAX_INCLUDE_DEPTH, "ERROR `#include` nested too deeply"
+    except AssertionError as error_msg:
+        print_compilation_error(tokens[0], error_msg)
+        exit(1)
     tokens_expanded = []
     token_index = 0
     while token_index < len(tokens):
         token_val = tokens[token_index][1]
         if token_val == "#include":
-            include_file = tokens[token_index + 1][1][1:-1]
+            try:     # Check for missing include_file 
+                assert (not (token_index + 1 >= len(tokens))), "ERROR `#include` missing include file"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[token_index], error_msg)
+                exit(1)
+            try:     # Can't include self 
+                assert (not (tokens[token_index + 1][1][1:-1] == tokens[token_index][0][0])), "ERROR `#include` can't include self"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[token_index + 1], "error_msg")
+                exit(1)
+            if (tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "\"\"":
+                include_type = "local"
+                # TODO: setup filepath for include_file based on local include_type 
+                include_file_path = tokens[token_index + 1][1][1:-1]
+            elif (tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "<>":
+                include_type = "system"
+                # TODO: setup filepath for include_file based on system include_type 
+                include_file_path = tokens[token_index + 1][1][1:-1]
+            else:
+                print_compilation_error(tokens[token_index + 1], "ERROR invalid include `%s`" % tokens[token_index + 1][1])
+                exit(1)
+            try:
+                assert (os.path.isfile(include_file_path)), "ERROR include file `%s` not found" % include_file_path
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[token_index + 1], error_msg)
+                exit(1)              
+            inc_token = tokens[token_index + 1]
             tokens.remove(tokens[token_index + 1])
-            for token in preprocessor_include(load_tokens(include_file)):
-                tokens_expanded.append(token)
+
+            if (not (include_file_path in include_depth)):  # Don't include if we've seen this file before
+                include_depth.append(include_file_path)
+                for token in preprocessor_include(load_tokens(include_file_path), include_depth):
+                    tokens_expanded.append(token)
+            else:
+                if Debug in [1, 2, 3]:
+                    print_compilation_error(inc_token, "INFO: ignoring `#include %s`, already included " % include_file_path)
         else:
             tokens_expanded.append(tokens[token_index])
         token_index += 1
 
     if Debug == 3:
-        print("tokens_2:", tokens_expanded, "\n")
-
+        print("DEBUG: preprocessor_include:")
+        pp = pprint.PrettyPrinter(indent=4, width=120)
+        pp.pprint(tokens_expanded)
+        print("\n")
     return tokens_expanded
 
 
 def load_tokens(file_path):
+    if not os.path.isfile(file_path):
+        print("ERROR input file `%s` not found" % file_path)
+        exit(1)
     tokens = []
     with open(file_path, "r", encoding="utf-8") as input_file:  
         for line in list(enumerate(input_file)): # (..., (0, ('./tests/character_literals.north', 0, 0), (1, ('"\\n"')) ), ...)
@@ -738,17 +788,17 @@ def load_tokens(file_path):
                             end_mark = column[1]
                         if (not (column[0] == 0)):  # not the beginning of the line
                             try:
-                                assert (line[1][column[0] - 1] == " ") # the previous char must be space, i.e. "abc""def" and 'a''b' not supported
-                            except AssertionError as e:
+                                assert (line[1][column[0] - 1] == " "), "ERROR tokens should be separated by whitespace" # the previous char must be space, i.e. "abc""def" and 'a''b' not supported
+                            except AssertionError as error_msg:
                                 token_type = "string" if (end_mark == "\"") else "character"
-                                print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR tokens should be separated by whitespace")
+                                print_compilation_error((((input_file.name, line_loc, column_loc), token)), error_msg)
                                 exit(1)
 
                 else:                                # We're building a token, find the end
                     if ((column[0] == len(line[1]) - 1) and ((token.count("\"") == 1) or (token.count("\'") == 1))):  # end of line and there's only one ´"´ or ´'´ in the token
                         try:
-                            assert (end_mark == "")
-                        except AssertionError as e:
+                            assert (end_mark == "")  #end_mark should be empty
+                        except AssertionError as error_msg:
                             if (token[-1:] == "\n"):
                                 token = token[:-1]
                             token_type = "string" if (end_mark == "\"") else "character"
@@ -766,9 +816,9 @@ def load_tokens(file_path):
                         if (len(token) == 2):
                             token = "0"
                         try:
-                            assert len(bytes(token, "utf-8").decode("unicode-escape")) <= 3
-                        except AssertionError as e:
-                            print_compilation_error((((input_file.name, line_loc, column_loc), token)), "ERROR invalid character literal `%s`" % token)
+                            assert len(bytes(token, "utf-8").decode("unicode-escape")) <= 3, "ERROR invalid character literal `%s`" % token
+                        except AssertionError as error_msg:
+                            print_compilation_error((((input_file.name, line_loc, column_loc), token)), error_msg)
                             exit(1)
 
                         tokens.append(((input_file.name, line_loc, column_loc), token))
@@ -780,12 +830,17 @@ def load_tokens(file_path):
                     else:        # continue building token
                         token += column[1]
 
-    if Debug == 3:
-        print("tokens_1:", tokens, "\n")
-    
-    if tokens == []:
-        print_compilation_error(((file_path, line_loc, column_loc), None), "ERROR no tokens found")
+    try:
+        assert len(tokens) > 0, "ERROR empty input file"
+    except AssertionError as error_msg:
+        print("%s:%d:%d: %s" % (file_path, 0, 0, error_msg))
         exit(1)
+
+    if Debug == 3:
+        print("DEBUG: load_tokens:")
+        pp = pprint.PrettyPrinter(indent=4, width=120)
+        pp.pprint(tokens)
+        print("\n")
 
     return tokens   # tokens = [ ... , (token_loc, token), ... ]        
 
@@ -830,7 +885,7 @@ if __name__ == "__main__":
         cleanup_command.remove(asm_file)
 
     tokens = load_tokens(input_file)
-    tokens_included = preprocessor_include(tokens)
+    tokens_included = preprocessor_include(tokens, include_depth=[])
     program, required_labels = locate_blocks(parse_tokens(tokens_included))
     compile_to_elf64_asm(program, required_labels, asm_file)
     run_cmd(nasm_command)
