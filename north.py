@@ -706,13 +706,6 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
         print("\n")
     return program
 
-# function to remove filename from path if present
-def remove_filename_from_path(path):
-    if path.find("/") == -1:
-        return path
-    else:
-        return path[:path.rfind("/")]
-
 
 def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc, token_val), ... ]
     try:
@@ -724,6 +717,7 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
     token_index = 0
     while token_index < len(tokens):
         token_val = tokens[token_index][1]
+        parent_file = tokens[token_index][0][0]
         if token_val == "#include":
             try:     # Check for missing include_file 
                 assert (not (token_index + 1 >= len(tokens))) , "ERROR `#include` missing include file"
@@ -738,9 +732,9 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
                 exit(1)
 
             try:     # Can't include self 
-                assert (not (tokens[token_index + 1][1][1:-1] == tokens[token_index][0][0])), "ERROR `#include` can't include self"
+                assert (not (tokens[token_index + 1][1][1:-1] == Path(parent_file).name)), "ERROR circular `#include` dependency"
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index + 1], "error_msg")
+                print_compilation_error(tokens[token_index + 1], error_msg)
                 exit(1)
             include_file = tokens[token_index + 1][1][1:-1]
             try:
@@ -751,7 +745,6 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
             # TODO: implement -I for additonal search paths
             # This is a local include
             if (tokens[token_index + 1][1][0] + tokens[token_index + 1][1][-1]) == "\"\"":
-                parent_file = tokens[token_index][0][0]
                 if (not (parent_file.find("/") == -1)):
                     search_path = parent_file[:parent_file.rfind("/")]
                 include_file_path = search_path + "/" + include_file
@@ -871,7 +864,7 @@ def load_tokens(file_path):
 
 def run_cmd(cmd):
     if Debug in [1, 2, 3]:
-        print(cmd)
+        print("  ", cmd)
     subprocess.call(cmd)
 
 
