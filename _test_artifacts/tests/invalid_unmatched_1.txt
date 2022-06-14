@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 75
+done
+^
+./tests/invalid_unmatched_1.north:2:0: ERROR unmatched token `done`
+

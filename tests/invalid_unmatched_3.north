@@ -1,0 +1,4 @@
+5 dup 0 > do
+  dup print
+  1 -
+done drop

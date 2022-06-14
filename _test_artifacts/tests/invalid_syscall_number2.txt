@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 126
+"string" 1 9999 syscall drop
+           ^
+./tests/invalid_syscall_number2.north:0:11: ERROR `9999 syscall` is not implemented
+

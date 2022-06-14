@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 128
+#include "invalid_preprocessor3.north"
+         ^
+./tests/invalid_preprocessor3.north:0:9: ERROR circular `#include` dependency
+
