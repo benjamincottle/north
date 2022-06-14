@@ -1,0 +1,103 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"name": "north",
+	"patterns": [
+		{
+			"include": "#keywords"
+		},
+		{
+			"include": "#strings"
+		},
+		{
+			"include": "#char"
+		},
+		{
+			"include": "#comments"
+		},
+		{
+			"include": "#numbers"
+		}
+	],
+	"repository": {
+		"keywords": {
+			"patterns": [{
+				"name": "entity.name.function.north",
+				"match": "\\b(if|else|endif|while|do|done)\\b"
+			},
+			{
+				"name": "entity.name.class.north",
+				"match": "\\b(dup|2dup|drop|2drop|over|2over|swap|2swap|rot|dupnz)\\b"
+			},
+			{
+				"match": "\\+|-|/|\\*|%",
+				"name": "keyword.operator.arithmetic.north"
+			},
+			{             
+				"match": "\\b(==|!=|<=|>=|<|>|min|max|and|&&|or|\\|\\||not|!)\\b",
+				"name": "keyword.operator.comparison1.north"
+			},
+			{             
+				"match": "(==|!=|<=|>=|<|>|&&|!)",
+				"name": "keyword.operator.comparison2.north"
+			},
+			{
+				"match": "&|\\||~|\\^|<<|>>",
+				"name": "keyword.operator.bitwise.north"
+			},
+			{
+				"match": "mem|load8|store8|load16|store16|load32|store32|load64|store64",
+				"name": "support.function.north"
+			},
+			{
+				"match": "syscall|print|exit",
+				"name": "keyword.operator.system.north"
+			},
+			{
+				"match": "#include",
+				"name": "meta.preprocessor.string.north"
+			}
+			]
+		},
+		"strings": {
+			"name": "string.quoted.double.north",
+			"begin": "\"",
+			"end": "\"",
+			"patterns": [
+				{
+					"name": "constant.character.escape.north",
+					"match": "\\\\."
+				}
+			]
+		},
+		"char": {
+			"name": "string.quoted.single.north",
+			"begin": "'",
+			"end": "'"
+		},
+		"comments": {
+			"patterns": [{
+				"name": "comment.line.north",
+				"match": "(;).*$\\n?"
+			}]
+		},
+		"numbers": {
+			"patterns": [
+				{
+					"match": "(?<=^|[\\s+=*/|<>!(&%\",^-])(?:(?:(0[xX])[0-9A-Fa-f]+|(0)[0-7]+)|[+-]?(?:0|[1-9]\\d*))(?=$|[\\s+=*/|<>!)&%\",^-])",
+					"name": "constant.numeric.north",
+					"captures": {
+						"1": {
+							"name": "keyword.operator.hex.north"
+						},
+						"2": {
+							"name": "keyword.operator.octal.north"
+						}
+					}
+				}
+			]
+		}
+
+
+	},
+	"scopeName": "source.north"
+}

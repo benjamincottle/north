@@ -1,0 +1,15 @@
+!=  ==  >  >=  <  <= min  max and 
+&& or || not ! 
+if else endif while do done 
+print syscall exit 
+dup 2dup drop 2drop over 2over swap
+2swap rot dupnz
++ - / * %
+& | ~ ^ << >>
+mem load8 store8 load16 store16 load32 
+store32 load64 store64
+99 "String!\n"
+'a' 'b' 'c' 
+#include "comments.north"
+#include <std.north>
+invalid
