@@ -1,0 +1,10 @@
+:i argc 0
+:b stdin 2
+A
+
+:i returncode 0
+:b stdout 14
+AHello World!
+
+:b stderr 0
+

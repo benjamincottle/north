@@ -1,0 +1,14 @@
+:i argc 1
+:b arg0 14
+arg1 arg2 arg3
+:b stdin 0
+
+:i returncode 0
+:b stdout 24
+./output
+arg1
+arg2
+arg3
+
+:b stderr 0
+

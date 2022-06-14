@@ -20,8 +20,3 @@ mem 4 + 'c' store8
 mem 5 + '\n' store8
 6 mem 1 1 syscall drop
 
-
-; test if nasm supports \n
-
-
-

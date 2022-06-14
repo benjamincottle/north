@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-
+import sys
 import pprint
 import argparse
 import subprocess
@@ -128,9 +128,9 @@ def print_compilation_error(token, error_msg):   # (token_loc, token_type, token
         input_line = ("".join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
         if input_line[-1:] != "\n":
             input_line += "\n"
-        print(input_line, end="")
-        print(" "*token_loc[2] + "^")
-        print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg))
+        print(input_line, end="", file=sys.stderr)
+        print(" "*token_loc[2] + "^", file=sys.stderr)
+        print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg), file=sys.stderr)
 
 
 def compile_to_elf64_asm(program, required_labels, output_file): # program = [ ... , (token_loc, token_type, token_value), ... ]
@@ -576,10 +576,9 @@ def locate_blocks(program): # [ ... ,(token_loc, token_type, token_value), ... ]
         exit(1)
 
     if Debug == 3:
-        print("DEBUG: locate_blocks:")
-        pp = pprint.PrettyPrinter(indent=4, width=120)
-        pp.pprint(program)
-        print("\n")
+        print("DEBUG: locate_blocks:", file=sys.stderr)
+        pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
     return program, required_labels
 
 
@@ -700,10 +699,9 @@ def parse_tokens(tokens): # tokens = [ ... , (token_loc, token), ... ]
                 exit(1)
 
     if Debug == 3:
-        print("DEBUG: parse_tokens:")
-        pp = pprint.PrettyPrinter(indent=4, width=120)
-        pp.pprint(program)
-        print("\n")
+        print("DEBUG: parse_tokens:", file=sys.stderr)
+        pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
     return program
 
 
@@ -776,16 +774,15 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , (token_loc,
         token_index += 1
 
     if Debug == 3:
-        print("DEBUG: preprocessor_include:")
-        pp = pprint.PrettyPrinter(indent=4, width=120)
-        pp.pprint(tokens_expanded)
-        print("\n")
+        print("DEBUG: preprocessor_include:", file=sys.stderr)
+        pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
     return tokens_expanded
 
 
 def load_tokens(file_path):
     if not Path(file_path).is_file():
-        print("ERROR input file `%s` not found" % file_path)
+        print("ERROR input file `%s` not found" % file_path, file=sys.stderr)
         exit(1)
     tokens = []
     with open(file_path, "r", encoding="utf-8") as input_file:  
@@ -850,34 +847,35 @@ def load_tokens(file_path):
     try:
         assert len(tokens) > 0, "ERROR empty input file"
     except AssertionError as error_msg:
-        print("%s:%d:%d: %s" % (file_path, 0, 0, error_msg))
+        print("%s:%d:%d: %s" % (file_path, 0, 0, error_msg), file=sys.stderr)
         exit(1)
 
     if Debug == 3:
-        print("DEBUG: load_tokens:")
-        pp = pprint.PrettyPrinter(indent=4, width=120)
-        pp.pprint(tokens)
-        print("\n")
+        print("DEBUG: load_tokens:", file=sys.stderr)
+        pprint.pprint(tokens, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
 
     return tokens   # tokens = [ ... , (token_loc, token), ... ]        
 
 
 def run_cmd(cmd):
     if Debug in [1, 2, 3]:
-        print("  ", cmd)
-    subprocess.call(cmd)
+        print("    [ " + " ".join(cmd) + " ]", file=sys.stderr)
+    return subprocess.call(cmd)
 
 
 if __name__ == "__main__":
-    arg_parser = argparse.ArgumentParser(add_help=False, description="north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.")
-    arg_parser.add_argument("-h", action="help", default=argparse.SUPPRESS, help="Show this help message and exit.")
-    arg_parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
-    arg_parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode with increasing verbosity.")
-    arg_parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
-    arg_parser.add_argument("-r", dest="exec_output", required=False, default=False, action="store_true", help="Additionally execute output on successful compilation.")
-    arg_parser.add_argument("input_file", type=str, help="path to the input_file.")
-    args = arg_parser.parse_args()
-
+    parser = argparse.ArgumentParser(add_help=False, description="north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.")
+    parser.add_argument("-h", action="help", default=argparse.SUPPRESS, help="Show this help message and exit.")
+    parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
+    parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode with increasing verbosity.")
+    parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
+    parser.add_argument("-r", dest="exec_output", required=False, action="store_true", help="Additionally execute output on successful compilation.")
+    parser.add_argument("-rA", dest="exec_args", required=False, type=str, default="", help="Optional command line arguments to pass to the execution. Quote multiple arguments or arguments containing spaces.")
+    parser.add_argument("input_file", type=str, help="path to the input_file.")
+    args = parser.parse_args()
+    if (args.exec_output == False) and (not(args.exec_args == "")):
+        parser.error('The -rA argument requires the -r argument.')
     input_file = args.input_file
     asm_file = Path(input_file).stem + ".asm"
     o_file = Path(input_file).stem + ".o"
@@ -889,7 +887,7 @@ if __name__ == "__main__":
         output_file = args.output_file
 
     Debug = args.D
-    exec_output = args.exec_output
+    exec_output = args.exec_output 
 
     nasm_command = ["nasm", "-g", "-felf64", asm_file]
     ld_command = ["ld", "-o", output_file, o_file]
@@ -912,4 +910,4 @@ if __name__ == "__main__":
         run_cmd(cleanup_command)
 
     if exec_output:
-        run_cmd(["./" + output_file])
+        exit(run_cmd(["./" + output_file] + args.exec_args.split()))

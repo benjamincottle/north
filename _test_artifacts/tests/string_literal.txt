@@ -1,0 +1,16 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 0
+:b stdout 92
+
+
+HelloHelloHello World!Hello World!
+   Hello World!
+Hello World!
+
+Hello World!
+More String
+
+:b stderr 0
+

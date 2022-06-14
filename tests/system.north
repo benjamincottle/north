@@ -4,7 +4,9 @@
 ; arg5 arg4 arg3 arg2 arg1 arg0 syscall_number syscall
 ; these correspond to the arguments in arg0 (%rdi) arg1 (%rsi) arg2 (%rdx) arg3 (%r10) arg4 (%r8) arg5 (%r9)
 ; not all arguments are required for each syscall
-
+; 
+; fd, 0 = stdin, 1 = stdout, 2 = stderr
+;
 ; syscall 0 (read)
 ; count *buf fd 0 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes read for syscall 0) is pushed back to the stack
@@ -29,7 +31,7 @@
 
 
 ; reading a byte from stdin
-1 mem 1 0 syscall drop
+1 mem 0 0 syscall drop
 
 ; writing it to stdout
 1 mem 1 1 syscall drop
@@ -38,7 +40,7 @@
 "Hello World!\n" 1 1 syscall drop
 
 ; exit with exit code 0
-0 231 syscall
+;0 231 syscall
 
 ; or more simply:
-0 exit
+;0 exit

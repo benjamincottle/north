@@ -32,7 +32,7 @@
 1 0 ^ print
 7320 53 ^ print
 
-; bitwise not - not working
+; bitwise not 
 0 ~ print   ; returning -1
 1 ~ print   ; returning -2
 

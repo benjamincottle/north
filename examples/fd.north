@@ -1,14 +1,14 @@
 ; read a byte from stdin and echo to stdout until (but including) the newline
-"Enter your preferred name: " 1 1 syscall drop 
+; "Enter your preferred name: " 1 1 syscall drop 
 
-0                                       ; stop_reading_flag
-while dup 0 == do                       ; while stop_reading_flag is false
-    1 mem 1 0 syscall drop              ; read a byte from stdin to mem at offset 0 (drop return)
-    mem load8 10 == if                  ; if byte is a newline
-        1 +                             ; set stop_reading_flag to true
-    endif
-    1 mem 1 1 syscall drop              ; write the byte from mem at offset 0 to stdout
-done
+; 0                                       ; stop_reading_flag
+; while dup 0 == do                       ; while stop_reading_flag is false
+;     1 mem 1 0 syscall drop              ; read a byte from stdin to mem at offset 0 (drop return)
+;     mem load8 10 == if                  ; if byte is a newline
+;         1 +                             ; set stop_reading_flag to true
+;     endif
+;     1 mem 1 1 syscall drop              ; write the byte from mem at offset 0 to stdout
+; done
 
 ; read a byte from stdin and store it in memory at increasing offset until (but including) the newline
 "Enter your preferred name: " 1 1 syscall drop 
@@ -16,7 +16,7 @@ done
 0 0                                     ; offset stop_reading_flag
 while dup 0 == do                       ; while stop_reading_flag is false
     over 1 swap 
-    mem + swap over 1 0 syscall drop    ; read a byte from stdin to mem + offset (drop return)
+    mem + swap over 0 0 syscall drop    ; read a byte from stdin to mem + offset (drop return)
     load8 10 == if                      ; if byte is a newline
         1 +                             ; set stop_reading_flag to true
     endif

@@ -1,13 +1,3 @@
 #include "arithmetic.north"
-#include "comparison.north"
-#include "stack_operations.north"
-#include "bitwise.north"
-#include "control_flow.north"
-#include "string_literal.north"
-#include "character_literal.north"
-#include "memory.north"
-#include "system.north"
-#include "comments.north"
-88 print
-
-
+; #include <std.north>
+632 print
