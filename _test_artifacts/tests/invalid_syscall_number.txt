@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 121
+"string" 1 drop syscall drop
+           ^
+./tests/invalid_syscall_number.north:0:11: ERROR invalid syscall number `drop`
+
