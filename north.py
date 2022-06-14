@@ -124,7 +124,7 @@ op_readable = {
 }
 
 
-def print_compilation_error(token, error_msg):   # ((file, line, col), (token_type, token_value)), "string"
+def print_compilation_error(token, error_msg):   # ((file, line, col), (token_type, builtin_type, [token_data])), "string"
     token_loc = token[0]
     with open(token_loc[0], "r") as input_file:
         input_line = ("".join([line for col, line in enumerate(input_file) if col == token_loc[1]]))
@@ -135,7 +135,7 @@ def print_compilation_error(token, error_msg):   # ((file, line, col), (token_ty
         print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg), file=sys.stderr)
 
 
-def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((file, line, col), (builtin_type, builtin_type, [token_value])), ... ], [label_number, ...]
+def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
     with open(output_file, "w") as asm: 
         ro_data = []
         asm.write("BITS 64\n")
@@ -175,7 +175,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
         asm.write("    ret\n")
         asm.write("global _start\n")
         asm.write("_start:\n")              
-        for op in list(enumerate(program)): # op = (index, ((file, line, col), (token_type, builtin_type, token_value)))
+        for op in list(enumerate(program)): # op = (index, ((file, line, col), (token_type, builtin_type, [token_data])))
             builtin_type = op[1][1][1]
             if ((op[0] in required_labels) or (Debug in [2, 3])):
                 asm.write(".L%d:\n" % (op[0]))
@@ -492,65 +492,65 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
         asm.write("    mem: resb %d\n" % MEMORY_SIZE)
 
 
-def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_value])), ... ]
+def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
     block_stack = []
     required_labels = []
     for op_label in range(len(program)):
         token_loc = program[op_label][0]
-        token_type = program[op_label][1][1]
-        if (token_type == Builtin.OP_WHILE):
+        builtin_type = program[op_label][1][1]
+        if (builtin_type == Builtin.OP_WHILE):
             block_stack.append(op_label)
-        elif (token_type == Builtin.OP_DO):
+        elif (builtin_type == Builtin.OP_DO):
             block_stack.append(op_label)
-        elif (token_type == Builtin.OP_DONE):
+        elif (builtin_type == Builtin.OP_DONE):
             try:
                 do_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
                 exit(1)
             try:
-                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
             try:
                 while_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
                 exit(1)
             try:
-                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
             program[do_loc] = (program[do_loc][0], (program[do_loc][1][0], program[do_loc][1][1], (op_label + 1))) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
-            program[op_label] = (token_loc, (program[op_label][1][0], token_type, (while_loc + 1))) # done has the while + 1 op's # as val
+            program[op_label] = (token_loc, (program[op_label][1][0], builtin_type, (while_loc + 1))) # done has the while + 1 op's # as val
             required_labels.append(while_loc + 1)
-        elif (token_type == Builtin.OP_IF):
+        elif (builtin_type == Builtin.OP_IF):
             block_stack.append(op_label)
-        elif (token_type == Builtin.OP_ELSE):
+        elif (builtin_type == Builtin.OP_ELSE):
             try:
                 if_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
                 exit(1)
             try:
-                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % op_readable[token_type.name]
+                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
             program[if_loc] = (program[if_loc][0], (program[if_loc][1][0], program[if_loc][1][1], (op_label + 1))) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
             block_stack.append(op_label)
-        elif (token_type == Builtin.OP_ENDIF):
+        elif (builtin_type == Builtin.OP_ENDIF):
             try:
                 if_or_else_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[token_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
                 exit(1)
             try:
-                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % op_readable[token_type.name]
+                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -559,155 +559,155 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
             required_labels.append(op_label + 1)
         # TODO: should check that `program[op_label - 1][2]` is a supported syscall number
         #       not just a valid integer that exists in the token_value
-        elif (token_type == Builtin.OP_SYSCALL):
+        elif (builtin_type == Builtin.OP_SYSCALL):
             try:
                 int(program[op_label - 1][1][2])
             except (IndexError, ValueError) as error_msg:
                 print_compilation_error(program[op_label - 1], "ERROR invalid syscall number `%s`" % op_readable[program[op_label - 1][1][1].name])
                 exit(1)
-            program[op_label] = (token_loc, (program[op_label][1][0], token_type, program[op_label - 1][1][2])) # syscall has (syscall - 1) op's value as value (syscall number)
-        elif (token_type == Builtin.OP_DUPNZ):
+            program[op_label] = (token_loc, (program[op_label][1][0], builtin_type, program[op_label - 1][1][2])) # syscall has (syscall - 1) op's value as value (syscall number)
+        elif (builtin_type == Builtin.OP_DUPNZ):
             required_labels.append(op_label + 1)
     try:
             assert block_stack == []
     except AssertionError as error_msg:
-        left_over_token = program[block_stack.pop()]
-        token_type = left_over_token[1][1]
-        print_compilation_error(left_over_token, "ERROR unmatched token `%s`" % op_readable[left_over_token[1][1].name])
+        unmatched_token = program[block_stack.pop()]
+        builtin_type = unmatched_token[1][1]
+        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % op_readable[unmatched_token[1][1].name])
         exit(1)
 
     if Debug == 3:
         print("DEBUG: locate_blocks:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_value])), ... ], [label_number, ...]
+    return program, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
 
 
-def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, token_value), ... ]
+def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, token_data), ... ]
     program = []
     for token in tokens:
         token_loc = token[0] 
         token_type = token[1][0]
-        token_value = token[1][1]
-        if token_value == "print":
+        token_data = token[1][1]
+        if token_data == "print":
             program.append((token_loc, (token_type, Builtin.OP_PRINT)))
-        elif token_value == "+":
+        elif token_data == "+":
             program.append((token_loc, (token_type, Builtin.OP_ADD)))
-        elif token_value == "-":
+        elif token_data == "-":
             program.append((token_loc, (token_type, Builtin.OP_SUB)))
-        elif token_value == "*":
+        elif token_data == "*":
             program.append((token_loc, (token_type, Builtin.OP_MUL)))
-        elif token_value == "/":
+        elif token_data == "/":
             program.append((token_loc, (token_type, Builtin.OP_DIV)))
-        elif token_value == "%":
+        elif token_data == "%":
             program.append((token_loc, (token_type, Builtin.OP_MOD)))
-        elif token_value == "mem":
+        elif token_data == "mem":
             program.append((token_loc, (token_type, Builtin.OP_MEM)))
-        elif token_value == "store8":
+        elif token_data == "store8":
             program.append((token_loc, (token_type, Builtin.OP_STORE8)))
-        elif token_value == "store16":
+        elif token_data == "store16":
             program.append((token_loc, (token_type, Builtin.OP_STORE16)))
-        elif token_value == "store32":
+        elif token_data == "store32":
             program.append((token_loc, (token_type, Builtin.OP_STORE32)))
-        elif token_value == "store64":
+        elif token_data == "store64":
             program.append((token_loc, (token_type, Builtin.OP_STORE64)))
-        elif token_value == "load8":
+        elif token_data == "load8":
             program.append((token_loc, (token_type, Builtin.OP_LOAD8)))
-        elif token_value == "load16":
+        elif token_data == "load16":
             program.append((token_loc, (token_type, Builtin.OP_LOAD16)))
-        elif token_value == "load32":
+        elif token_data == "load32":
             program.append((token_loc, (token_type, Builtin.OP_LOAD32)))
-        elif token_value == "load64":
+        elif token_data == "load64":
             program.append((token_loc, (token_type, Builtin.OP_LOAD64)))
-        elif token_value == "exit":
+        elif token_data == "exit":
             program.append((token_loc, (token_type, Builtin.OP_EXIT)))
-        elif token_value == "dup":
+        elif token_data == "dup":
             program.append((token_loc, (token_type, Builtin.OP_DUP)))
-        elif token_value == "2dup":
+        elif token_data == "2dup":
             program.append((token_loc, (token_type, Builtin.OP_2DUP)))
-        elif token_value == "drop":
+        elif token_data == "drop":
             program.append((token_loc, (token_type, Builtin.OP_DROP)))
-        elif token_value == "2drop":
+        elif token_data == "2drop":
             program.append((token_loc, (token_type, Builtin.OP_2DROP)))
-        elif token_value == "over":
+        elif token_data == "over":
             program.append((token_loc, (token_type, Builtin.OP_OVER)))
-        elif token_value == "2over":
+        elif token_data == "2over":
             program.append((token_loc, (token_type, Builtin.OP_2OVER)))
-        elif token_value == "swap":
+        elif token_data == "swap":
             program.append((token_loc, (token_type, Builtin.OP_SWAP)))
-        elif token_value == "2swap":
+        elif token_data == "2swap":
             program.append((token_loc, (token_type, Builtin.OP_2SWAP)))
-        elif token_value == "rot":
+        elif token_data == "rot":
             program.append((token_loc, (token_type, Builtin.OP_ROT)))
-        elif token_value == "dupnz":
+        elif token_data == "dupnz":
             program.append((token_loc, (token_type, Builtin.OP_DUPNZ)))
-        elif token_value == "max":
+        elif token_data == "max":
             program.append((token_loc, (token_type, Builtin.OP_MAX)))
-        elif token_value == "min":
+        elif token_data == "min":
             program.append((token_loc, (token_type, Builtin.OP_MIN)))
-        elif token_value == "==":
+        elif token_data == "==":
             program.append((token_loc, (token_type, Builtin.OP_EQUAL)))
-        elif token_value == "!=":
+        elif token_data == "!=":
             program.append((token_loc, (token_type, Builtin.OP_NOTEQUAL)))
-        elif token_value == ">":
+        elif token_data == ">":
             program.append((token_loc, (token_type, Builtin.OP_GT)))
-        elif token_value == ">=":
+        elif token_data == ">=":
             program.append((token_loc, (token_type, Builtin.OP_GE)))
-        elif token_value == "<":
+        elif token_data == "<":
             program.append((token_loc, (token_type, Builtin.OP_LT)))
-        elif token_value == "<=":
+        elif token_data == "<=":
             program.append((token_loc, (token_type, Builtin.OP_LE)))
-        elif ((token_value == "and") or (token_value == "&&")):
+        elif ((token_data == "and") or (token_data == "&&")):
             program.append((token_loc, (token_type, Builtin.OP_LOGICAL_AND)))
-        elif ((token_value == "or") or (token_value == "||")):
+        elif ((token_data == "or") or (token_data == "||")):
             program.append((token_loc, (token_type, Builtin.OP_LOGICAL_OR)))
-        elif ((token_value == "not") or (token_value == "!")):
+        elif ((token_data == "not") or (token_data == "!")):
             program.append((token_loc, (token_type, Builtin.OP_LOGICAL_NOT)))
-        elif token_value == "<<":
+        elif token_data == "<<":
             program.append((token_loc, (token_type, Builtin.OP_LSHIFT)))
-        elif token_value == ">>":
+        elif token_data == ">>":
             program.append((token_loc, (token_type, Builtin.OP_RSHIFT)))
-        elif token_value == "&":
+        elif token_data == "&":
             program.append((token_loc, (token_type, Builtin.OP_BITWISE_AND)))          
-        elif token_value == "|":
+        elif token_data == "|":
             program.append((token_loc, (token_type, Builtin.OP_BITWISE_OR)))          
-        elif token_value == "~":
+        elif token_data == "~":
             program.append((token_loc, (token_type, Builtin.OP_BITWISE_NOT)))            
-        elif token_value == "^":
+        elif token_data == "^":
             program.append((token_loc, (token_type, Builtin.OP_XOR)))
-        elif token_value == "while":
+        elif token_data == "while":
             program.append((token_loc, (token_type, Builtin.OP_WHILE)))
-        elif token_value == "do":
+        elif token_data == "do":
             program.append((token_loc, (token_type, Builtin.OP_DO)))
-        elif token_value == "done":
+        elif token_data == "done":
             program.append((token_loc, (token_type, Builtin.OP_DONE)))
-        elif token_value == "if":
+        elif token_data == "if":
             program.append((token_loc, (token_type, Builtin.OP_IF)))
-        elif token_value == "else":
+        elif token_data == "else":
             program.append((token_loc, (token_type, Builtin.OP_ELSE)))
-        elif token_value == "endif":
+        elif token_data == "endif":
             program.append((token_loc, (token_type, Builtin.OP_ENDIF)))
-        elif token_value == "syscall":
+        elif token_data == "syscall":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL)))
-        elif token_value[0] + token_value[-1] == "\"\"":
-            program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_value)))
-        elif token_value[0] + token_value[-1] == "\'\'":
-            program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_value[1:-1], "utf-8").decode("unicode-escape")))))
+        elif token_data[0] + token_data[-1] == "\"\"":
+            program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
+        elif token_data[0] + token_data[-1] == "\'\'":
+            program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
         else:
             try:
-                program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, int(token_value))))
+                program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, int(token_data))))
             except ValueError as error_msg:
-                print_compilation_error(token, "ERROR invalid token `%s`" % token_value)
+                print_compilation_error(token, "ERROR invalid token `%s`" % token_data)
                 exit(1)
 
     if Debug == 3:
         print("DEBUG: parse_tokens:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program     # [ ... ,((file, line, col), (token_type, builtin_type, [token_value])), ... ]
+    return program     # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
 
 
-def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, line, col), (token_type, token_value)), ... ]
+def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, line, col), (token_type, token_data)), ... ]
     try:
         assert len(include_depth) <= MAX_INCLUDE_DEPTH, "ERROR `#include` nested too deeply"
     except AssertionError as error_msg:
@@ -717,9 +717,9 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
     token_index = 0
     while token_index < len(tokens):
         token_type = tokens[token_index][1][0]
-        token_val = tokens[token_index][1][1]
+        token_data = tokens[token_index][1][1]
         parent_file = tokens[token_index][0][0]
-        if token_val == "#include":
+        if token_data == "#include":
             try:     # Check for missing include_file 
                 assert (not (token_index + 1 >= len(tokens))) , "ERROR `#include` missing include file"
             except AssertionError as error_msg:
@@ -781,13 +781,13 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
         print("DEBUG: preprocessor_include:", file=sys.stderr)
         pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_value)), ... ]
+    return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
 
 
 def parse_line(file_path, line_num, line):
     token = ""
     token_type = ""
-    token_loc = 0
+    col_num = 0
     cur_column = 0
     while len(line) > 0:    
         if token == "" and line[0].isspace():   # skip leading whitespace
@@ -796,7 +796,7 @@ def parse_line(file_path, line_num, line):
         elif line[0] == "\"":          # string literal
             token += line[0]
             line = line[1:]
-            token_loc = cur_column
+            col_num = cur_column
             cur_column += 1
             while len(line) > 0:
                 if line[0]  == "\"":   # end of string literal
@@ -807,9 +807,9 @@ def parse_line(file_path, line_num, line):
                         if (len(line) > 0):
                             assert (line[0] == " "), "ERROR tokens should be separated by whitespace `%s`" % token
                     except AssertionError as error_msg:
-                        print_compilation_error((((file_path, line_num, token_loc), token)), error_msg)
+                        print_compilation_error((((file_path, line_num, col_num), token)), error_msg)
                         exit(1)  
-                    yield ((file_path, line_num, token_loc), (token_type, token))
+                    yield ((file_path, line_num, col_num), (token_type, token))
                     cur_column += 1
                     token = ""
                     break
@@ -819,7 +819,7 @@ def parse_line(file_path, line_num, line):
         elif line[0] == "'":           # character literal
             token += line[0]
             line = line[1:]
-            token_loc = cur_column
+            col_num = cur_column
             cur_column += 1
             while len(line) > 0:
                 if line[0]  == "'":    # end of character literal
@@ -831,15 +831,15 @@ def parse_line(file_path, line_num, line):
                     try:
                         assert len(bytes(token, "utf-8").decode("unicode-escape")) <= 3, "ERROR invalid character literal `%s`" % token
                     except AssertionError as error_msg:
-                        print_compilation_error((((file_path, line_num, token_loc), token)), error_msg)
+                        print_compilation_error((((file_path, line_num, col_num), token)), error_msg)
                         exit(1)       
                     try:
                         if (len(line) > 0):
                             assert (line[0] == " "), "ERROR tokens should be separated by whitespace `%s`" % token
                     except AssertionError as error_msg:
-                        print_compilation_error((((file_path, line_num, token_loc), token)), error_msg)
+                        print_compilation_error((((file_path, line_num, col_num), token)), error_msg)
                         exit(1)  
-                    yield ((file_path, line_num, token_loc), (token_type, token))
+                    yield ((file_path, line_num, col_num), (token_type, token))
                     cur_column += 1
                     token = ""
                     break
@@ -848,29 +848,29 @@ def parse_line(file_path, line_num, line):
                 cur_column += 1
 
         elif line[0].isspace():  # whitespace marks end of token
-            if token.isdigit():
+            if token.isdecimal():
                 token_type = "int"
             else:
                 token_type = "keyword"
             line = line[1:]
             cur_column += 1
-            yield ((file_path, line_num, token_loc), (token_type, token))
+            yield ((file_path, line_num, col_num), (token_type, token))
             token = ""
         else:                    # start or continue building the keyword token
             if token == "":
-                token_loc = cur_column
+                col_num = cur_column
             token += line[0]
             line = line[1:]
             cur_column += 1
     if token.count("\"") == 1:
-        print_compilation_error((((file_path, line_num, token_loc), token)), "ERROR invalid string literal `%s`" % token)
+        print_compilation_error((((file_path, line_num, col_num), token)), "ERROR invalid string literal `%s`" % token)
         exit(1)
     if token.count("'") == 1:
-        print_compilation_error((((file_path, line_num, token_loc), token)), "ERROR invalid character literal `%s`" % token)
+        print_compilation_error((((file_path, line_num, col_num), token)), "ERROR invalid character literal `%s`" % token)
         exit(1)
     if token != "":
         token_type = "keyword"
-        yield ((file_path, line_num, token_loc), (token_type, token))
+        yield ((file_path, line_num, col_num), (token_type, token))
     return
 
 
@@ -881,7 +881,9 @@ def load_tokens(file_path):
     tokens = []
     with open(file_path, "r", encoding="utf-8") as input_file:
         for line_num, line in enumerate(input_file.readlines()):
-            line = line[:-1].split(";", 1)[0]   # remove comments
+            if (line[-1:] == "\n"):        # remove the newline if present
+                line = line[:-1]
+            line = line.split(";", 1)[0]   # remove single line comments
             if line != "":
                 for token in parse_line(file_path, line_num, line):
                     tokens.append(token)
@@ -894,7 +896,7 @@ def load_tokens(file_path):
         print("DEBUG: load_tokens:", file=sys.stderr)
         pprint.pprint(tokens, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return tokens   # tokens = [ ... , ((file, line, col), (token_type, token_value)), ... ]        
+    return tokens   # tokens = [ ... , ((file, line, col), (token_type, token_data)), ... ]        
 
 
 def run_cmd(cmd):
