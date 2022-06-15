@@ -7,8 +7,6 @@ import subprocess
 from pathlib import Path
 from enum import Enum, auto
 
-from sympy import Ci
-
 
 Debug = 0
 MEMORY_SIZE = 128000
@@ -471,7 +469,8 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
             elif builtin_type == Builtin.OP_PUSH_STR:
                 if (not (op[1][1][2]) in ro_data):
                     ro_data.append(op[1][1][2])
-                asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2])) + "_len"))
+                str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 1
+                asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
 
             else:
@@ -485,9 +484,8 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
         asm.write("section .rodata\n")              # .ro_data section
         for string in list(enumerate(ro_data)):
             str_label = "str%d" % (string[0])
-            str_data = "`" + string[1][1:-1] + "`"    # nasm: Strings enclosed in backquotes support C-style -escapes for special characters.
+            str_data = string[1] if string[1] else "0x0"
             asm.write("    " + str_label + ": db " + str_data + "\n")
-            asm.write("    " + str_label + "_len: equ $ - " + str_label + "\n")
         asm.write("segment .bss\n")                 # .bss section
         asm.write("    mem: resb %d\n" % MEMORY_SIZE)
 
@@ -690,6 +688,7 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
         elif token_data == "syscall":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL)))
         elif token_data[0] + token_data[-1] == "\"\"":
+            token_data = "".join([",0x%0x" % ord(c) for c in bytes(token_data[1:-1], "utf-8").decode("unicode-escape")])[1:]
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
         elif token_data[0] + token_data[-1] == "\'\'":
             program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
@@ -849,7 +848,7 @@ def parse_line(file_path, line_num, line):
 
         elif line[0].isspace():  # whitespace marks end of token
             if token.isdecimal():
-                token_type = "int"
+                token_type = "uint"
             else:
                 token_type = "keyword"
             line = line[1:]
