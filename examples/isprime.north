@@ -2,14 +2,14 @@
 
 dup 2 != if                        ; check if argc is != 2 (just one test candidate)
     ;TODO: unhardcode binary name
-    "usage: ./isprime test_candidate\n" 1 1 syscall drop
+    "usage: ./isprime test_candidate\n" 1 1 syscall3 drop
     1 exit
 else
     2drop                          ; "argc = 2, don't need argc or &argv[0] anymore
     0 swap                         ; setup thestack > index result &str_ptr
     while dup load8 dup 0 != do    ; while we haven't reached the null byte  stack > index result &str_ptr str_ptr
         dup 48 < over 57 > or if   ; check if we have an ascii char 0 - 9 
-            "candidate should be a positive integer\n" 1 1 syscall drop
+            "candidate should be a positive integer\n" 1 1 syscall3 drop
             1 exit
         endif
         48 -
@@ -23,29 +23,29 @@ else
     ; swap drop                     ; stack > candidate
 
     dup 4611686018427387904 > if
-        "candidates <= 2^62 only sorry!\ntry 4611686018427387847, it's the biggest prime <= 2^62\n" 1 1 syscall drop    
+        "candidates <= 2^62 only sorry!\ntry 4611686018427387847, it's the biggest prime <= 2^62\n" 1 1 syscall3 drop    
         1 exit
     endif                     ;stack > candidate
 
     dup 2 == over 3 == or if
-        "yes, it's a prime!\n" 1 1 syscall drop    
+        "yes, it's a prime!\n" 1 1 syscall3 drop    
         0 exit
     endif
 
     dup 1 <= over 2 % 0 == or over 3 % 0 == or if
-        "no, it's not a prime\n" 1 1 syscall drop    
+        "no, it's not a prime\n" 1 1 syscall3 drop    
         0 exit
     endif
                                                            ;expects stack > candidate
     5 while 2dup dup * swap <= do                          ;stack> candidate i  
         2dup 2dup % 0 == rot rot 2 + % 0 == or if
-            "no, it's not a prime\n" 1 1 syscall drop    
+            "no, it's not a prime\n" 1 1 syscall3 drop    
             0 exit
         endif
         6 +
     done
     over 
-    "yes, it's a prime!\n" 1 1 syscall drop    
+    "yes, it's a prime!\n" 1 1 syscall3 drop    
     0 exit  
 endif
 

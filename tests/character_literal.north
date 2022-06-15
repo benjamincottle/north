@@ -18,5 +18,5 @@ mem 2 + 'b' store8
 mem 3 + ' ' store8
 mem 4 + 'c' store8
 mem 5 + '\n' store8
-6 mem 1 1 syscall drop
+6 mem 1 1 syscall3 drop
 

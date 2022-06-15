@@ -17,7 +17,7 @@ while dup 0 > do                                     ; while argc > 0
     mem swap + 2swap rot rot store8                  ; store the newline in mem at memoffset 
     1 +                                              ; increment memoffset
     swap drop                                        ; drop the ptr &argv[n]                       
-    dup mem 1 1 syscall drop                         ; print the argv[n], drop syscall returncode
+    dup mem 1 1 syscall3 drop                         ; print the argv[n], drop syscall returncode
     drop 0                                           ; set memoffset to 0
     swap                                              
     1 -                                              ; decrement argc

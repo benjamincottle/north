@@ -24,15 +24,15 @@
 ; supports \n newline char inline
 ; empty string literal "" is represented as "\0"
 
- "" 1 1 syscall drop
-   "\n" 1 1 syscall drop ; not working
- "\nHello" 1 1 syscall drop
-   "Hello" 1 1 syscall drop
-"Hello World!" 1 1 syscall drop
- "Hello World!\n" 1 1 syscall drop
-"   Hello World!\n" 1 1 syscall drop
-"Hello World!\n\n" 1 1 syscall drop
-"Hello World!\nMore String\n" 1 1 syscall drop
+ "" 1 1 syscall3 drop
+   "\n" 1 1 syscall3 drop ; not working
+ "\nHello" 1 1 syscall3 drop
+   "Hello" 1 1 syscall3 drop
+"Hello World!" 1 1 syscall3 drop
+ "Hello World!\n" 1 1 syscall3 drop
+"   Hello World!\n" 1 1 syscall3 drop
+"Hello World!\n\n" 1 1 syscall3 drop
+"Hello World!\nMore String\n" 1 1 syscall3 drop
 
 
 

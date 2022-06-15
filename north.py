@@ -9,7 +9,7 @@ from enum import Enum, auto
 
 
 Debug = 0
-MEMORY_SIZE = 128000
+MEMORY_SIZE = "0x1f400"
 MAX_INCLUDE_DEPTH = 58
 
 
@@ -65,7 +65,9 @@ class Builtin(Enum):
     OP_IF = auto()
     OP_ELSE = auto()
     OP_ENDIF = auto()
-    OP_SYSCALL = auto()
+    OP_SYSCALL_1 = auto()
+    OP_SYSCALL_2 = auto()
+    OP_SYSCALL_3 = auto()    
 
 
 op_readable = {
@@ -118,7 +120,9 @@ op_readable = {
     "OP_IF": "if",
     "OP_ELSE": "else",
     "OP_ENDIF": "endif",
-    "OP_SYSCALL": "syscall",
+    "OP_SYSCALL_1": "syscall1",
+    "OP_SYSCALL_2": "syscall2",
+    "OP_SYSCALL_3": "syscall3",
 }
 
 
@@ -139,37 +143,37 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
         asm.write("BITS 64\n")
         asm.write("segment .text\n")
         asm.write("print:\n")
-        asm.write("    mov     r9, -3689348814741910323\n")
-        asm.write("    sub     rsp, 40\n")
-        asm.write("    mov     BYTE [rsp+31], 10\n")
-        asm.write("    lea     rcx, [rsp+30]\n")
+        asm.write("    mov     r9, 0xcccccccccccccccd\n")
+        asm.write("    sub     rsp, 0x28\n")
+        asm.write("    mov     BYTE [rsp+0x1f], 0xa\n")
+        asm.write("    lea     rcx, [rsp+0x1e]\n")
         asm.write(".L00:\n")
         asm.write("    mov     rax, rdi\n")
-        asm.write("    lea     r8, [rsp+32]\n")
+        asm.write("    lea     r8, [rsp+0x20]\n")
         asm.write("    mul     r9\n")
         asm.write("    mov     rax, rdi\n")
         asm.write("    sub     r8, rcx\n")
-        asm.write("    shr     rdx, 3\n")
-        asm.write("    lea     rsi, [rdx+rdx*4]\n")
+        asm.write("    shr     rdx, 0x3\n")
+        asm.write("    lea     rsi, [rdx+rdx*0x4]\n")
         asm.write("    add     rsi, rsi\n")
         asm.write("    sub     rax, rsi\n")
-        asm.write("    add     eax, 48\n")
+        asm.write("    add     eax, 0x30\n")
         asm.write("    mov     BYTE [rcx], al\n")
         asm.write("    mov     rax, rdi\n")
         asm.write("    mov     rdi, rdx\n")
         asm.write("    mov     rdx, rcx\n")
-        asm.write("    sub     rcx, 1\n")
-        asm.write("    cmp     rax, 9\n")
+        asm.write("    sub     rcx, 0x1\n")
+        asm.write("    cmp     rax, 0x9\n")
         asm.write("    ja      .L00\n")
-        asm.write("    lea     rax, [rsp+32]\n")
-        asm.write("    mov     edi, 1\n")
+        asm.write("    lea     rax, [rsp+0x20]\n")
+        asm.write("    mov     edi, 0x1\n")
         asm.write("    sub     rdx, rax\n")
         asm.write("    xor     eax, eax\n")
-        asm.write("    lea     rsi, [rsp+32+rdx]\n")
+        asm.write("    lea     rsi, [rsp+0x20+rdx]\n")
         asm.write("    mov     rdx, r8\n")
-        asm.write("    mov     rax, 1\n")
+        asm.write("    mov     rax, 0x1\n")
         asm.write("    syscall\n")
-        asm.write("    add     rsp, 40\n")
+        asm.write("    add     rsp, 0x28\n")
         asm.write("    ret\n")
         asm.write("global _start\n")
         asm.write("_start:\n")              
@@ -180,7 +184,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
             if (Debug in [2, 3]):
                 asm.write("    ;; -- %s --\n" % builtin_type.name)
             if builtin_type == Builtin.OP_PUSH_INT:
-                asm.write("    mov     rax, %d\n" % op[1][1][2])
+                asm.write("    mov     rax, %s\n" % hex(op[1][1][2]))
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_PRINT:
                 asm.write("    pop     rdi\n")
@@ -209,11 +213,11 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                     asm.write("    mul     rcx\n")
                     asm.write("    push    rdx\n")
                 except (IndexError, ValueError):
-                    asm.write("    mov     rdx, 0\n")
+                    asm.write("    mov     rdx, 0x0\n")
                     asm.write("    div     rbx\n")
                     asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_MOD:
-                asm.write("    mov     rdx, 0\n")
+                asm.write("    mov     rdx, 0x0\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
                 asm.write("    div     rbx\n")
@@ -257,7 +261,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    mov     rbx, [rax]\n")
                 asm.write("    push    rbx\n")                
             elif builtin_type == Builtin.OP_EXIT:
-                asm.write("    mov     eax, 231\n")
+                asm.write("    mov     eax, 0xe7\n")
                 asm.write("    pop     rdi\n")
                 asm.write("    syscall\n")
             elif builtin_type == Builtin.OP_DUP:
@@ -333,48 +337,48 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    cmovle  rax, rbx\n")
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_EQUAL:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmove   rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_NOTEQUAL:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovne  rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_GT:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovg   rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_GE:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovge  rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_LT:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
                 asm.write("    cmovl   rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_LE:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    cmp     rbx, rax\n")
@@ -386,19 +390,19 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    mul     rbx\n")
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_LOGICAL_OR:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
                 asm.write("    add     rax, rbx\n")                
-                asm.write("    cmp     rax, 0\n")
+                asm.write("    cmp     rax, 0x0\n")
                 asm.write("    cmovne  rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_LOGICAL_NOT:
-                asm.write("    mov     rcx, 0\n")
-                asm.write("    mov     rdx, 1\n")
+                asm.write("    mov     rcx, 0x0\n")
+                asm.write("    mov     rdx, 0x1\n")
                 asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 0\n")
+                asm.write("    cmp     rax, 0x0\n")
                 asm.write("    cmove  rcx, rdx\n")
                 asm.write("    push    rcx\n")
             elif builtin_type == Builtin.OP_LSHIFT:
@@ -436,41 +440,40 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 pass
             elif builtin_type == Builtin.OP_DO:
                 asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 0\n")
+                asm.write("    cmp     rax, 0x0\n")
                 asm.write("    je      .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_DONE:
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_IF:
                 asm.write("    pop     rax\n")
-                asm.write("    cmp     rax, 0\n")      
+                asm.write("    cmp     rax, 0x0\n")      
                 asm.write("    je      .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_ELSE:
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_ENDIF:
                 pass        
-            elif builtin_type == Builtin.OP_SYSCALL:
                 # TODO: Support all syscalls
+            elif builtin_type == Builtin.OP_SYSCALL_1:
+                # These are Linux syscalls that utilise arg0 (%rdi)
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_SYSCALL_2:
+                # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    pop     rsi\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_SYSCALL_3:
                 # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx)
-                if op[1][1][2] in [0, 1, 2, 7, 8, 10, 16, 19, 20, 26, 27, 28, 29, 30, 31, 38, 41, 42, 43, 46, 47, 49, 51, 52, 59, 64, 65, 71, 72, 78, 89, 92, 93, 94, 103, 117, 118, 119, 120, 129, 133, 139, 141, 144, 173, 175, 187, 194, 195, 196, 203, 204, 209, 210, 212, 217, 222, 234, 238, 245, 251, 254, 258, 261, 263, 266, 268, 269, 274, 282, 292, 304, 309, 313, 314, 317, 318, 321, 324, 325]:
                     asm.write("    pop     rax\n")
                     asm.write("    pop     rdi\n")
                     asm.write("    pop     rsi\n")
                     asm.write("    pop     rdx\n")
                     asm.write("    syscall\n")
-                    asm.write("    push     rax\n")
-                # These are Linux syscalls that utilise arg0 (%rdi)
-                elif op[1][1][2] in [3, 12, 22, 32, 37, 60, 63, 67, 74, 75, 80, 81, 84, 87, 95, 99, 100, 105, 106, 121, 122, 123, 124, 134, 135, 145, 146, 147, 151, 159, 161, 163, 168, 201, 207, 213, 218, 225, 226, 231, 241, 272, 284, 291, 294, 306, 323, 331]:
-                    asm.write("    pop     rax\n")
-                    asm.write("    pop     rdi\n")
-                    asm.write("    syscall\n")
-                    asm.write("    push     rax\n")
-                else:
-                    try:
-                        raise NotImplementedError()
-                    except NotImplementedError as e:
-                        print_compilation_error(program[op[0] - 1], "ERROR `%d syscall` is not implemented" % (op[1][1][2]))
-                        exit(1)
-
+                    asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_PUSH_STR:
                 if (not (op[1][1][2]) in ro_data):
                     ro_data.append(op[1][1][2])
@@ -482,8 +485,8 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 assert False, "Unreachable"
 
         asm.write(".L%d:\n" % len(program))         # implicit exit       
-        asm.write("    mov     eax, 231\n")
-        asm.write("    mov     rdi, 0\n")
+        asm.write("    mov     eax, 0xe7\n")
+        asm.write("    mov     rdi, 0x0\n")
         asm.write("    syscall\n")
 
         if ro_data != []:
@@ -493,7 +496,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 str_data = string[1] if string[1] else "0x0"
                 asm.write("    " + str_label + ": db " + str_data + "\n")
         asm.write("segment .bss\n")                 # .bss section
-        asm.write("    mem: resb %d\n" % MEMORY_SIZE)
+        asm.write("    mem: resb %s\n" % MEMORY_SIZE)
 
 
 def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
@@ -561,15 +564,6 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], (program[if_or_else_loc][1][0], program[if_or_else_loc][1][1], (op_label + 1))) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
-        # TODO: should check that `program[op_label - 1][2]` is a supported syscall number
-        #       not just a valid integer that exists in the token_value
-        elif (builtin_type == Builtin.OP_SYSCALL):
-            try:
-                int(program[op_label - 1][1][2])
-            except (IndexError, ValueError) as error_msg:
-                print_compilation_error(program[op_label - 1], "ERROR invalid syscall number `%s`" % op_readable[program[op_label - 1][1][1].name])
-                exit(1)
-            program[op_label] = (token_loc, (program[op_label][1][0], builtin_type, program[op_label - 1][1][2])) # syscall has (syscall - 1) op's value as value (syscall number)
         elif (builtin_type == Builtin.OP_DUPNZ):
             required_labels.append(op_label + 1)
     try:
@@ -691,8 +685,12 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_ELSE)))
         elif token_data == "endif":
             program.append((token_loc, (token_type, Builtin.OP_ENDIF)))
-        elif token_data == "syscall":
-            program.append((token_loc, (token_type, Builtin.OP_SYSCALL)))
+        elif token_data == "syscall1":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_1)))
+        elif token_data == "syscall2":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_2)))
+        elif token_data == "syscall3":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_3)))            
         elif token_data[0] + token_data[-1] == "\"\"":
             token_data = "".join([",0x%0x" % ord(c) for c in bytes(token_data[1:-1], "utf-8").decode("unicode-escape")])[1:]
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))

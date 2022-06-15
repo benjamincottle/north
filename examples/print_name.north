@@ -11,12 +11,12 @@
 ; done
 
 ; read a byte from stdin and store it in memory at increasing offset until (but including) the newline
-"Enter your preferred name: " 1 1 syscall drop 
+"Enter your preferred name: " 1 1 syscall3 drop 
 
 0 0                                     ; offset stop_reading_flag
 while dup 0 == do                       ; while stop_reading_flag is false
     over 1 swap 
-    mem + swap over 0 0 syscall drop    ; read a byte from stdin to mem + offset (drop return)
+    mem + swap over 0 0 syscall3 drop    ; read a byte from stdin to mem + offset (drop return)
     load8 10 == if                      ; if byte is a newline
         1 +                             ; set stop_reading_flag to true
     endif
@@ -25,9 +25,9 @@ while dup 0 == do                       ; while stop_reading_flag is false
     swap
 done drop                               ; drop stop_reading_flag ;stack> offset
 
-"Hello " 1 1 syscall drop
-1 - mem 1 1 syscall drop
-"! That's a lovely name :P\n" 1 1 syscall drop
+"Hello " 1 1 syscall3 drop
+1 - mem 1 1 syscall3 drop
+"! That's a lovely name :P\n" 1 1 syscall3 drop
 
 0 exit
 

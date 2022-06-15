@@ -31,16 +31,16 @@
 
 
 ; reading a byte from stdin
-1 mem 0 0 syscall drop
+1 mem 0 0 syscall3 drop
 
 ; writing it to stdout
-1 mem 1 1 syscall drop
+1 mem 1 1 syscall3 drop
 
 ; or more simply:
-"Hello World!\n" 1 1 syscall drop
+"Hello World!\n" 1 1 syscall3 drop
 
 ; exit with exit code 0
-;0 231 syscall
+;0 231 syscall1
 
 ; or more simply:
 ;0 exit

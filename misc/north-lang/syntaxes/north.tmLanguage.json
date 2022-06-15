@@ -49,7 +49,7 @@
 				"name": "support.function.north"
 			},
 			{
-				"match": "syscall|print|exit",
+				"match": "syscall1|syscall2|syscall3|syscall4|syscall5|syscall6|print|exit",
 				"name": "keyword.operator.system.north"
 			},
 			{
