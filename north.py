@@ -200,13 +200,13 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    pop     rbx\n")
                 asm.write("    mul     rbx\n")
                 asm.write("    push    rax\n")
-            # TODO: DIV can be optimised to MUL (https://repnz.github.io/posts/reversing-optimizations-division/)
             elif builtin_type == Builtin.OP_DIV:
-                asm.write("    mov     rdx, 0\n")
+                opt_divisor = hex(int(2**64 / program[op[0] - 1][1][2]))
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
-                asm.write("    div     rbx\n")
-                asm.write("    push    rax\n")
+                asm.write("    mov     rcx, %s\n" % opt_divisor)
+                asm.write("    mul     rcx\n")
+                asm.write("    push    rdx\n")
             elif builtin_type == Builtin.OP_MOD:
                 asm.write("    mov     rdx, 0\n")
                 asm.write("    pop     rbx\n")
@@ -481,11 +481,12 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
         asm.write("    mov     rdi, 0\n")
         asm.write("    syscall\n")
 
-        asm.write("section .rodata\n")              # .ro_data section
-        for string in list(enumerate(ro_data)):
-            str_label = "str%d" % (string[0])
-            str_data = string[1] if string[1] else "0x0"
-            asm.write("    " + str_label + ": db " + str_data + "\n")
+        if ro_data != []:
+            asm.write("section .rodata\n")              # .ro_data section
+            for string in list(enumerate(ro_data)):
+                str_label = "str%d" % (string[0])
+                str_data = string[1] if string[1] else "0x0"
+                asm.write("    " + str_label + ": db " + str_data + "\n")
         asm.write("segment .bss\n")                 # .bss section
         asm.write("    mem: resb %d\n" % MEMORY_SIZE)
 

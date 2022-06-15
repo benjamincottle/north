@@ -22,7 +22,7 @@
 ;       push 1
 ; the syscall consumes 4 args and the return code (number of bytes written) is pushed to the stack
 ; supports \n newline char inline
-
+; empty string literal "" is represented as "\0"
 
  "" 1 1 syscall drop
    "\n" 1 1 syscall drop ; not working

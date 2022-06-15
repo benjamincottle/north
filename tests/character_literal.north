@@ -10,8 +10,8 @@
 ;'''                 ; invalid   ERROR tokens should be separated by whitespace
 ;'a'storZZ           ; invalid   ERROR tokens should be separated by whitespace
 ;'a''b'              ; invalid   ERROR tokens should be separated by whitespace
+; empty character literal '' is represented as '\0'
 
-;working
 mem 0 + 'a' store8
 mem 1 + '' store8
 mem 2 + 'b' store8

@@ -2,7 +2,7 @@
 :b stdin 0
 
 :i returncode 0
-:b stdout 33
+:b stdout 38
 96
 14
 33
@@ -12,6 +12,7 @@
 6
 6
 5
+2500
 0
 2
 4
