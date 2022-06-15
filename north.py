@@ -201,12 +201,17 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    mul     rbx\n")
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_DIV:
-                opt_divisor = hex(int(2**64 / program[op[0] - 1][1][2]))
                 asm.write("    pop     rbx\n")
                 asm.write("    pop     rax\n")
-                asm.write("    mov     rcx, %s\n" % opt_divisor)
-                asm.write("    mul     rcx\n")
-                asm.write("    push    rdx\n")
+                try:
+                    opt_divisor = hex(int(2**64 / program[op[0] - 1][1][2]))
+                    asm.write("    mov     rcx, %s\n" % opt_divisor)
+                    asm.write("    mul     rcx\n")
+                    asm.write("    push    rdx\n")
+                except (IndexError, ValueError):
+                    asm.write("    mov     rdx, 0\n")
+                    asm.write("    div     rbx\n")
+                    asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_MOD:
                 asm.write("    mov     rdx, 0\n")
                 asm.write("    pop     rbx\n")
