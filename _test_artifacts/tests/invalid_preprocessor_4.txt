@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 96
+#include dup
+         ^
+./tests/invalid_preprocessor_4.north:0:9: ERROR invalid `#include` file
+

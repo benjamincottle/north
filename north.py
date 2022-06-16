@@ -717,58 +717,57 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
         print_compilation_error(tokens[0], error_msg)
         exit(1)
     tokens_expanded = []
-    token_index = 0
-    while token_index < len(tokens):
-        token_type = tokens[token_index][1][0]
-        token_data = tokens[token_index][1][1]
-        parent_file = tokens[token_index][0][0]
+    while len(tokens) > 0:
+        token_type = tokens[0][1][0]
+        token_data = tokens[0][1][1]
+        parent_file = tokens[0][0][0]
         if token_data == "#include":
             try:     # Check for missing include_file 
-                assert (not (token_index + 1 >= len(tokens))) , "ERROR `#include` missing include file"
+                assert (len(tokens) >= 2) , "ERROR `#include` missing include file"
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index], error_msg)
+                print_compilation_error(tokens[0], error_msg)
                 exit(1)
-
+            next_token_data = tokens[1][1][1]
             try:     # Check for valid include_file format
-                assert (((tokens[token_index + 1][1][1][0] + tokens[token_index + 1][1][1][-1]) == "\"\"") or ((tokens[token_index + 1][1][1][0] + tokens[token_index + 1][1][1][-1]) == "<>")) , "ERROR invalid `#include` file"
+                assert (((next_token_data[0] + next_token_data[-1]) == "\"\"") or ((next_token_data[0] + next_token_data[-1]) == "<>")) , "ERROR invalid `#include` file"
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index], error_msg)
+                print_compilation_error(tokens[1], error_msg)
                 exit(1)
 
             try:     # Can't include self 
-                assert (not (tokens[token_index + 1][1][1][1:-1] == Path(parent_file).name)), "ERROR circular `#include` dependency"
+                assert (not (next_token_data[1:-1] == Path(parent_file).name)), "ERROR circular `#include` dependency"
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index + 1], error_msg)
+                print_compilation_error(tokens[1], error_msg)
                 exit(1)
-            include_file = tokens[token_index + 1][1][1][1:-1]
+            include_file = next_token_data[1:-1]
             try:
                 assert include_file.find("/") == -1, "ERROR `#include` can not be a path. Additional search paths not implemented"
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index + 1], error_msg)
+                print_compilation_error(tokens[1], error_msg)
                 exit(1)
             # TODO: implement -I for additonal search paths
             search_path = "."
             # This is a local include
-            if (tokens[token_index + 1][1][1][0] + tokens[token_index + 1][1][1][-1]) == "\"\"":
+            if (next_token_data[0] + next_token_data[-1]) == "\"\"":
                 if (not (parent_file.find("/") == -1)):
                     search_path = parent_file[:parent_file.rfind("/")]
                 include_file_path = search_path + "/" + include_file
             # This is a system include
-            elif (tokens[token_index + 1][1][1][0] + tokens[token_index + 1][1][1][-1]) == "<>":
+            elif (next_token_data[0] + next_token_data[-1]) == "<>":
                 include_type = "system"
                 # TODO: setup filepath for include_file based on system include_type 
-                include_file_path = tokens[token_index + 1][1][1][1:-1]
+                include_file_path = next_token_data[1:-1]
                 assert False, "ERROR `#include` system includes not implemented"
             else:
-                print_compilation_error(tokens[token_index + 1], "ERROR invalid include `%s`" % tokens[token_index + 1][1][1])
+                print_compilation_error(tokens[1], "ERROR invalid include `%s`" % next_token_data)
                 exit(1)
             try:  
                 assert (Path(include_file_path).is_file()), "ERROR include file `%s` not found" % include_file
             except AssertionError as error_msg:
-                print_compilation_error(tokens[token_index + 1], error_msg)
+                print_compilation_error(tokens[1], error_msg)
                 exit(1)              
-            inc_token = tokens[token_index + 1]
-            tokens.remove(tokens[token_index + 1])
+            inc_token = tokens[1]
+            tokens = tokens[2:]
             if (not (include_file_path in include_depth)):  # Don't include if we've seen this file before
                 include_depth.append(include_file_path)
                 for token in preprocessor_include(load_tokens(include_file_path), include_depth):
@@ -777,8 +776,8 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
                 if Debug in [1, 2, 3]:
                     print_compilation_error(inc_token, "INFO: ignoring `#include %s`, already included " % include_file_path)
         else:
-            tokens_expanded.append(tokens[token_index])
-        token_index += 1
+            tokens_expanded.append(tokens[0])
+            tokens = tokens[1:]
 
     if Debug == 3:
         print("DEBUG: preprocessor_include:", file=sys.stderr)
@@ -786,6 +785,51 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
         print("\n", file=sys.stderr)
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
 
+
+def preprocessor_define(tokens):
+    tokens_expanded = []
+    token_index = 0
+    defines = {}
+    while len(tokens) > 0:
+        token_type = tokens[0][1][0]
+        token_data = tokens[0][1][1]
+        parent_file = tokens[0][0][0]
+        if (token_data == "#define"):
+            try:     # Check for missing define_name 
+                assert (len(tokens) >= 2) , "ERROR `#define` missing define name"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            try:     # Check for valid define_name format
+                assert (tokens[1][1][0] == "keyword"), "ERROR invalid `#define` name"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[1], error_msg)
+                exit(1)
+            define_name = tokens[1][1][1]
+            try:     # Check for missing define_value
+                assert (len(tokens) >= 3) , "ERROR `#define` missing define value"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            define_token = tokens[2][1]
+            if (not (define_name in defines)):
+                defines[define_name] = define_token
+            else:
+                print_compilation_error(tokens[0], "ERROR `#define` redefinition of `%s`" % define_name)
+                exit(1)
+            tokens = tokens[3:]
+        else:
+            if token_data in defines:
+                tokens[0] = ((tokens[0][0], (defines[tokens[0][1][1]])))
+
+            tokens_expanded.append(tokens[0])
+            tokens = tokens[1:]
+    if Debug == 3:
+        print("DEBUG: preprocessor_define:", file=sys.stderr)
+        pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
+    return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
+            
 
 def parse_line(file_path, line_num, line):
     token = ""
@@ -872,7 +916,10 @@ def parse_line(file_path, line_num, line):
         print_compilation_error((((file_path, line_num, col_num), token)), "ERROR invalid character literal `%s`" % token)
         exit(1)
     if token != "":
-        token_type = "keyword"
+        if token.isdecimal():
+            token_type = "uint"
+        else:
+            token_type = "keyword"
         yield ((file_path, line_num, col_num), (token_type, token))
     return
 
@@ -895,6 +942,7 @@ def load_tokens(file_path):
     except AssertionError as error_msg:
         print("%s:%d:%d: %s" % (file_path, 0, 0, error_msg), file=sys.stderr)
         exit(1)
+
     if Debug == 3:
         print("DEBUG: load_tokens:", file=sys.stderr)
         pprint.pprint(tokens, stream=sys.stderr, indent=4, width=120)
@@ -944,8 +992,10 @@ if __name__ == "__main__":
         cleanup_command.remove(asm_file)
 
     tokens = load_tokens(input_file)                                            # load tokens from input_file
-    tokens_included = preprocessor_include(tokens, include_depth=[])            # recursively process includes
-    program, required_labels = locate_blocks(parse_tokens(tokens_included))     # parse tokens to program
+    # tokens_included = preprocessor_include(tokens, include_depth=[])            # recursively process includes
+    tokens_included = preprocessor_include(tokens, include_depth=[])                    # recursively process includes
+    tokens_processed = preprocessor_define(tokens_included)                     # process defines
+    program, required_labels = locate_blocks(parse_tokens(tokens_processed))     # parse tokens to program
     compile_to_elf64_asm(program, required_labels, asm_file)                    # compile to asm
     run_cmd(nasm_command)                                                       # assemble to elf
     run_cmd(ld_command)                                                         # link to executable

@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 110
+#define MAX_LEN_OF_MAC_TABLE
+^
+./tests/invalid_preprocessor_8.north:0:0: ERROR `#define` missing define value
+

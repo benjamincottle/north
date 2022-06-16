@@ -1,0 +1,7 @@
+#define MAX_LEN_OF_MAC_TABLE       32
+
+MAX_LEN_OF_MAC_TABLE print
+
+#define MAX_LEN_OF_MAC_TABLE       64
+
+MAX_LEN_OF_MAC_TABLE print

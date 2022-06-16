@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 91
+#include
+^
+./tests/invalid_preprocessor_5.north:0:0: ERROR `#include` missing include file
+

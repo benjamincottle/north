@@ -1,0 +1,5 @@
+; object-like macro
+; #define <identifier> <replacement token list>
+
+#define MAX_FILE_SIZE 1024
+MAX_FILE_SIZE print
