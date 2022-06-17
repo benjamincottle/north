@@ -67,7 +67,11 @@ class Builtin(Enum):
     OP_ENDIF = auto()
     OP_SYSCALL_1 = auto()
     OP_SYSCALL_2 = auto()
-    OP_SYSCALL_3 = auto()    
+    OP_SYSCALL_3 = auto()
+    OP_SYSCALL_4 = auto()
+    OP_SYSCALL_5 = auto()
+    OP_SYSCALL_6 = auto()
+
 
 
 op_readable = {
@@ -123,6 +127,9 @@ op_readable = {
     "OP_SYSCALL_1": "syscall1",
     "OP_SYSCALL_2": "syscall2",
     "OP_SYSCALL_3": "syscall3",
+    "OP_SYSCALL_4": "syscall1",
+    "OP_SYSCALL_5": "syscall2",
+    "OP_SYSCALL_6": "syscall3",
 }
 
 
@@ -452,7 +459,6 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_ENDIF:
                 pass        
-                # TODO: Support all syscalls
             elif builtin_type == Builtin.OP_SYSCALL_1:
                 # These are Linux syscalls that utilise arg0 (%rdi)
                 asm.write("    pop     rax\n")
@@ -468,12 +474,42 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_SYSCALL_3:
                 # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx)
-                    asm.write("    pop     rax\n")
-                    asm.write("    pop     rdi\n")
-                    asm.write("    pop     rsi\n")
-                    asm.write("    pop     rdx\n")
-                    asm.write("    syscall\n")
-                    asm.write("    push    rax\n")
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    pop     rsi\n")
+                asm.write("    pop     rdx\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_SYSCALL_4:
+                # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx) arg3 (%r10)
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    pop     rsi\n")
+                asm.write("    pop     rdx\n")
+                asm.write("    pop     r10\n")                
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_SYSCALL_5:
+                # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx) arg3 (%r10) arg4 (%r8)
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    pop     rsi\n")
+                asm.write("    pop     rdx\n")
+                asm.write("    pop     r10\n")                
+                asm.write("    pop     r8\n")                                                
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_SYSCALL_6:
+                # These are Linux syscalls that utilise arg0 (%rdi)	arg1 (%rsi)	arg2 (%rdx) arg3 (%r10) arg4 (%r8) arg5 (%r9)
+                asm.write("    pop     rax\n")
+                asm.write("    pop     rdi\n")
+                asm.write("    pop     rsi\n")
+                asm.write("    pop     rdx\n")
+                asm.write("    pop     r10\n")                
+                asm.write("    pop     r8\n")
+                asm.write("    pop     r9\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_PUSH_STR:
                 if (not (op[1][1][2]) in ro_data):
                     ro_data.append(op[1][1][2])
@@ -691,6 +727,12 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL_2)))
         elif token_data == "syscall3":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL_3)))            
+        elif token_data == "syscall4":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_4)))
+        elif token_data == "syscall5":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_5)))
+        elif token_data == "syscall6":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_6)))     
         elif token_data[0] + token_data[-1] == "\"\"":
             token_data = "".join([",0x%0x" % ord(c) for c in bytes(token_data[1:-1], "utf-8").decode("unicode-escape")])[1:]
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
