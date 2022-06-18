@@ -10,8 +10,8 @@
 ;"string                     ; invalid   ERROR invalid string literal `"string`
 ;"""                         ; invalid   ERROR tokens should be separated by whitespace
 ;"abc""def"                  ; invalid   ERROR tokens should be separated by whitespace
-;"abc"1 1 syscall drop       ; invalid   ERROR tokens should be separated by whitespace
-;"halløj\n" 1 1 syscall      ; broken    outputs hallÃ¸j
+;"abc"1 1 syscall3 drop       ; invalid   ERROR tokens should be separated by whitespace
+;"halløj\n" 1 1 syscall3      ; broken    outputs hallÃ¸j
 
 ; notes
 ;count *buf fd 1 syscall
@@ -25,7 +25,7 @@
 ; empty string literal "" is represented as "\0"
 
  "" 1 1 syscall3 drop
-   "\n" 1 1 syscall3 drop ; not working
+   
  "\nHello" 1 1 syscall3 drop
    "Hello" 1 1 syscall3 drop
 "Hello World!" 1 1 syscall3 drop
@@ -33,9 +33,11 @@
 "   Hello World!\n" 1 1 syscall3 drop
 "Hello World!\n\n" 1 1 syscall3 drop
 "Hello World!\nMore String\n" 1 1 syscall3 drop
-
-
-
+"String1 with \"some\" escapes\n" 1 1 syscall3 drop
+"\"String2\" \"with\" \"some\" \"escapes\"\n" 1 1 syscall3 drop
+"\"" 1 1 syscall3 drop
+"\n" 1 1 syscall3 drop 
+"halløj, jeg kan også dansk!\n" 1 1 syscall3 drop
 ;$ ./output
 ;
 ;

@@ -3,11 +3,10 @@
 ;' '                 ; valid
 ;'a'                 ; valid
 ;'"'                 ; valid
-
+;'\''                ; valid
 ;'a                  ; invalid   ERROR invalid character literal `'a`
 ;mem 0 + 'a'store8   ; invalid   ERROR tokens should be separated by whitespace
 ;'de'                ; invalid   ERROR invalid character literal `'de'`
-;'''                 ; invalid   ERROR tokens should be separated by whitespace
 ;'a'storZZ           ; invalid   ERROR tokens should be separated by whitespace
 ;'a''b'              ; invalid   ERROR tokens should be separated by whitespace
 ; empty character literal '' is represented as '\0'
@@ -17,6 +16,7 @@ mem 1 + '' store8
 mem 2 + 'b' store8
 mem 3 + ' ' store8
 mem 4 + 'c' store8
-mem 5 + '\n' store8
-6 mem 1 1 syscall3 drop
+mem 5 + '\'' store8
+mem 6 + '\n' store8
+7 mem 1 1 syscall3 drop
 

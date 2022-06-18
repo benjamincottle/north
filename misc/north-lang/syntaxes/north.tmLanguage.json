@@ -53,7 +53,7 @@
 				"name": "keyword.operator.system.north"
 			},
 			{
-				"match": "#include",
+				"match": "#include|#define",
 				"name": "meta.preprocessor.string.north"
 			}
 			]
@@ -72,7 +72,13 @@
 		"char": {
 			"name": "string.quoted.single.north",
 			"begin": "'",
-			"end": "'"
+			"end": "'",
+			"patterns": [
+				{
+					"name": "constant.character.escape.north",
+					"match": "\\\\."
+				}
+			]
 		},
 		"comments": {
 			"patterns": [{

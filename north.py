@@ -742,7 +742,7 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             try:
                 program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, int(token_data))))
             except ValueError as error_msg:
-                print_compilation_error(token, "ERROR invalid token `%s`" % token_data)
+                print_compilation_error(token, ("ERROR invalid token `%s`" % token_data).encode('unicode-escape').decode('utf-8'))
                 exit(1)
 
     if Debug == 3:
@@ -882,19 +882,22 @@ def parse_line(file_path, line_num, line):
         if token == "" and line[0].isspace():   # skip leading whitespace
             line = line[1:]
             cur_column += 1
-        elif line[0] == "\"":          # string literal
+        elif line[0] == "\"":                   # string literal begin
             token += line[0]
             line = line[1:]
             col_num = cur_column
             cur_column += 1
             while len(line) > 0:
-                if line[0]  == "\"":   # end of string literal
+                if line[0] == "\\":             # string literal escape next char
+                    token += (line[0] + line[1]).encode("utf-8").decode("unicode_escape")
+                    line = line[2:]
+                if ((line[0]  == "\"")):        # string literal end
                     token_type = "string"
                     token += line[0]
                     line = line[1:]
                     try:
                         if (len(line) > 0):
-                            assert (line[0] == " "), "ERROR tokens should be separated by whitespace `%s`" % token
+                            assert (line[0] == " "), ("ERROR tokens should be separated by whitespace `%s`" % token).encode('unicode-escape').decode('utf-8')
                     except AssertionError as error_msg:
                         print_compilation_error((((file_path, line_num, col_num), token)), error_msg)
                         exit(1)  
@@ -905,13 +908,16 @@ def parse_line(file_path, line_num, line):
                 token += line[0]
                 line = line[1:]
                 cur_column += 1
-        elif line[0] == "'":           # character literal
+        elif line[0] == "'":                    # character literal begin
             token += line[0]
             line = line[1:]
             col_num = cur_column
             cur_column += 1
             while len(line) > 0:
-                if line[0]  == "'":    # end of character literal
+                if line[0] == "\\":             # character literal escape next char
+                    token += (line[0] + line[1]).encode("utf-8").decode("unicode_escape")
+                    line = line[2:]
+                if line[0]  == "'":             # character literal end
                     token_type = "char"
                     token += line[0]
                     line = line[1:]
@@ -935,8 +941,7 @@ def parse_line(file_path, line_num, line):
                 token += line[0]
                 line = line[1:]
                 cur_column += 1
-
-        elif line[0].isspace():  # whitespace marks end of token
+        elif line[0].isspace():                 # whitespace marks end of token
             if token.isdecimal():
                 token_type = "uint"
             else:
@@ -945,7 +950,7 @@ def parse_line(file_path, line_num, line):
             cur_column += 1
             yield ((file_path, line_num, col_num), (token_type, token))
             token = ""
-        else:                    # start or continue building the keyword token
+        else:                                   # start or continue building the token
             if token == "":
                 col_num = cur_column
             token += line[0]
