@@ -5,7 +5,7 @@
 ; these correspond to the arguments in arg0 (%rdi) arg1 (%rsi) arg2 (%rdx) arg3 (%r10) arg4 (%r8) arg5 (%r9)
 ; not all arguments are required for each syscall
 ; 
-; fd, 0 = stdin, 1 = stdout, 2 = stderr
+; fd, stdin = 0,  stdout = 1,  stderr = 2
 ;
 ; syscall 0 (read)
 ; count *buf fd 0 syscall
@@ -16,19 +16,30 @@
 ; count *buf fd 1 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes written for syscall 1) is pushed back to the stack
 
-; syscall 231 (exit_group)
-; exitcode 231 syscall
-; the ´syscall´ token consumes 2 args from the stack, exits the program with ´exitcode´, does not return
-
 ; syscall 2 (open)
 ; mode flags *filename 2 syscall
 ; the ´syscall´ token consumes 4 args from the stack and the return (fd for file) is pushed back to the stack
+; fd, stdin = 0,  stdout = 1,  stderr = 2
+; mode: O_RDONLY 0
+;       O_WRONLY 1
+;       O_RDWR   2
+;
+; flags: In addition, zero or more file creation flags and file status
+;        flags can be bitwise-or'd in flags
+;
+; *filename:
+;    const char *pathname 
+;    "foo.north" swap drop           ; stack> &str_ptr
+;    "foo/bar.north" swap drop
+;    "/foo/bar/baz.north" swap drop
 
 ; syscall 3 (close)
 ; fd 3 syscall
 ; the ´syscall´ token consumes 2 args from the stack and the return (0 for success, -1 for error) is pushed back to the stack
 
-
+; syscall 231 (exit_group)
+; exitcode 231 syscall
+; the ´syscall´ token consumes 2 args from the stack, exits the program with ´exitcode´, does not return
 
 ; reading a byte from stdin
 1 mem 0 0 syscall3 drop
@@ -39,8 +50,8 @@
 ; or more simply:
 "Hello World!\n" 1 1 syscall3 drop
 
-; exit with exit code 0
-;0 231 syscall1
+; exit with exit code 42
+42 231 syscall1
 
 ; or more simply:
-;0 exit
+;42 exit

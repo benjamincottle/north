@@ -530,7 +530,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
             for string in list(enumerate(ro_data)):
                 str_label = "str%d" % (string[0])
                 str_data = string[1] if string[1] else "0x0"
-                asm.write("    " + str_label + ": db " + str_data + "\n")
+                asm.write("    " + str_label + ": db " + str_data + ",0x0" + "\n")
         asm.write("segment .bss\n")                 # .bss section
         asm.write("    mem: resb %s\n" % MEMORY_SIZE)
 
