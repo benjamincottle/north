@@ -1,58 +1,147 @@
-; using syscall 2 (open) and syscall 0 (read) to read a file to mem
-; syscall 1 (write) to write it to stdout
-; and syscall 3 (close) to close it.
+; clone of the GNU coreutils cat utility
 ;
-; fd, 0 = stdin, 1 = stdout, 2 = stderr
-; syscall 2 (open)
-; mode flags *filename 2 syscall
-; the ´syscall´ token consumes 4 args from the stack and the return (fd for file) is pushed back to the stack
+#define read 0
+#define write 1
+#define open 2 
+#define close 3 
+#define fstat 5
+#define stdin 0
+#define stdout 1
+#define stderr 2
+#define O_RDONLY 0
+#define STAT_STRUCT_MEM_OFFSET 4096 ; allows for MAX_PATH 
+#define ST_MODE_OFFSET 4121         ; st_mode is 25th byte in STAT_STRUCT_MEM_OFFSET
+#define S_IFMT_MASK 240             ; and mask for st_mode bit field
+#define S_IFREG 128                 ; regular file
+#define S_IFDIR 64                  ; directory
+#define S_IFCHR 32                  ; character device
 
-;mode: O_RDONLY 0
-;      O_WRONLY 1
-;      O_RDWR   2
-
-; flags In addition, zero or more file creation flags and file status
-;       flags can be bitwise-or'd in flags
-
-; *filename
-; const char *pathname 
-; "foo.north" swap drop           ; stack> &str_ptr
-; "foo/bar.north" swap drop
-; "/foo/bar/baz.north" swap drop
-
-; syscall 0 (read)
-; count *buf fd 0 syscall
-; the ´syscall´ token consumes 4 args from the stack and the return code (number of bytes read for syscall 0) is pushed back to the stack
-; remember read() doesn't add '\0' to terminate to make it string (just gives raw buffer).
-
-; syscall 3 (close)
-; fd 3 syscall
-; the ´syscall´ token consumes 2 args from the stack and the return (0 for success, -1 for error) is pushed back to the stack
-
-; expects stack> &argv[N] ... &argv[1] &argv[0] argc
-dup 2 != if                        ; check if argc is != 2 (just one arg)
-    ;TODO: unhardcode binary name
-    "usage: ./cat file\n" 1 1 syscall3 drop
-    1 exit
-else
-    2drop                           ; stack> &argv[1]    ; drop argc and &argv[0]
-0 swap                              ; stack> offset1 &argv[1]  
-    while dup load8 dup 0 != do     ; stack > offset1 &argv[1] argv[1]
-        rot swap over 
-        mem + swap store8
-        1 + swap 
-        1 + 
-    done drop drop
-endif                               ; stack> offset1     ; mem[0] to mem[offset1]   contains argv[1]
-drop                                ; stack>             ; drop offset
-; stack > 
-0 0 0 mem                           ; stack> offset2 mode flags *filename
-2 syscall3                          ; stack> offset2 fd
-1                                   ; stack> offset2 fd bytes_read 
-while 0 != do                       ; stack> offset2 fd 
-    2dup swap mem + 0 1 rot 2swap syscall3     ; syscall read
-    rot 1 + rot rot
+                                                   ; expects stack> &argv[N] ... &argv[1] &argv[0] argc
+2dup 1 == if                                       ; with no args, read from stdin
+    mem 45 store8                                  ; store "-" at mem_ptr[0]
+    2drop drop
+    mem 0 2 1                                      ; set up dummy argv[0] to drop
+endif drop
+1 - swap drop 0 swap                               ; set memoffset to 0
+while dup 0 > do                                   ;> stack &argv[N] ... &argv[2] &argv[1] memoffset argc  ; while argc > 0
+    rot while dup load8 dup 0 != do                ;> stack &argv[N] ... &argv[2] memoffset argc &argv[1] argv[1]     ; while we haven't reached the null byte
+        rot swap 2swap over
+        mem swap + 2swap rot rot store8            ; store char in mem at memoffset
+        1 + swap 1 + rot swap                      ; increment memoffset then the ptr &argv[1]
+    done drop                                      ;> stack &argv[N] ... &argv[2] memoffset argc &argv[1]  ; drop the null byte
+    0                                              ; a null byte
+    rot swap 2swap over
+    mem swap + 2swap rot rot store8                ; store the null byte in mem at memoffset 
+    1 +                                            ; increment memoffset
+    swap drop                                      ; drop the ptr &argv[1]                       
+    O_RDONLY 0 mem open                            ; stack> &argv[N] ... &argv[2] argc memoffset mode flags *filename syscall_num
+    syscall3                                       ; stack> &argv[N] ... &argv[2] argc memoffset fd
+    dup 18446744073709551614 == if                 ; stack> &argv[N] ... &argv[2] argc memoffset fd   ; if syscall was unsuccessful, 18446744073709551614 is returned otherwise the fd is returned
+        drop                                       ; stack> &argv[N] ... &argv[2] argc memoffset 
+        mem load8 45 == mem 1 + load8 0 == and if  ; stack> &argv[N] ... &argv[2] argc memoffset 
+            0 1                                    ; stack> fd bytes_read 
+            while 0 != do                          ; stack> fd 
+                dup mem read 1024 rot 2swap syscall3    
+                dup mem stdout write syscall3 drop
+            done drop   
+            drop 0                                 ; set memoffset to 0
+            swap                                              
+            1 -                                    ; decrement argc, so that the next file is read
+        else                                       ;stack> &argv[N] ... &argv[2]  argc memoffset
+            0 mem                                  ;> argc memoffset 0 &mem_ptr
+            "--version" swap drop                  ;> argc memoffset 0 &mem_ptr &str_ptr
+            while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do
+                2dup load8 swap load8 swap != if
+                    rot drop 1 rot rot
+                endif
+                1 + swap 1 + swap
+            done 
+            load8 swap load8 swap != or 0 == if    ; if argv1 = "--version" display version and exit
+                "cat (north example) 1.0.0\n\n" stdout write syscall3 drop
+                "This is free and unencumbered software released into the public domain.\n\n" stdout write syscall3 drop
+                "Anyone is free to copy, modify, publish, use, compile, sell, or\n" stdout write syscall3 drop
+                "distribute this software, either in source code form or as a compiled\n" stdout write syscall3 drop
+                "binary, for any purpose, commercial or non-commercial, and by any\n" stdout write syscall3 drop
+                "means.\n" stdout write syscall3 drop
+                0 exit
+            endif
+            0 mem
+            "--help" swap drop                      ;stack> &argv[N] ... &argv[2] &argv[1] argc 0 &argv[2] &str_ptr
+            while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do  ; while str_a[i] != '\0' and str_b[i] != '\0' and flag is not set
+                2dup load8 swap load8 swap != if
+                    rot drop 1 rot rot
+                endif
+                1 + swap 1 + swap
+            done 
+            load8 swap load8 swap != or 0 == if     ; if argv1 = "--help" display help and exit
+                "Usage: cat [OPTION]... [FILE]...\n" stdout write syscall3 drop
+                "Concateate FILE(s) to standard output.\n\n" stdout write syscall3 drop
+                "With no FILE, or when FILE is -, read standard input.\n\n" stdout write syscall3 drop
+                "    --help display this help and exit\n" stdout write syscall3 drop
+                "    --version output version information and exit\n\n" stdout write syscall3 drop
+                "Examples:\n" stdout write syscall3 drop
+                "cat f - g Output f's contents, then standard input, then g's contents.\n" stdout write syscall3 drop
+                "cat Copy standard input to standard output.\n" stdout write syscall3 drop
+                0 exit
+            endif  
+            0 mem
+            "--" swap drop                          ;> argc memoffset 0 &mem_ptr &str_ptr
+            while rot dup 1 !=                     
+                2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do
+                2dup load8 swap load8 swap != if 
+                    rot drop 1 rot rot         
+                endif
+                1 + swap 1 + swap 
+            done                                    ;> argc memoffset  0 &mem_ptr &str_ptr 
+            rot dup 2swap over swap 2swap load8 0 > swap 0 == and if ;> argc memoffset  &mem_ptr &str_ptr 
+                "cat: unrecognized option '" stderr write syscall3 drop
+                2drop 2drop 2drop
+                mem stderr write syscall3 drop
+                "'\nTry 'cat --help' for more information.\n" stderr write syscall3 drop
+                1 exit
+            endif                                   ;stack> &argv[N] ... &argv[2]  argc memoffset
+            0 mem
+            "-" swap drop                           ;> argc memoffset 0 &mem_ptr &str_ptr
+            while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do
+                2dup load8 swap load8 swap != if
+                    rot drop 1 rot rot
+                endif
+                1 + swap 1 + swap
+            done     
+            rot dup 2swap over swap 2swap load8 0 > swap 0 == and if
+                "cat: invalid option -- '" stderr write syscall3 drop
+                2drop 2drop 2drop
+                mem 2 1 syscall3 drop
+                "'\nTry 'cat --help' for more information.\n" stderr write syscall3 drop
+                1 exit
+            endif
+            2drop 2drop 2drop
+            "cat: " stderr write syscall3 drop
+            dup mem stderr write syscall3 drop
+            ": No such file or directory\n" stderr write syscall3 drop
+            drop 0 swap                             ; set memoffset to 0
+            1 -                                     ; decrement argc, so that the next file is read
+        endif                                       ; stack> &argv[N] ... &argv[2]  memoffset argc
+    else                                            ; syscall was successful, the fd is returned  ;stack> argc memoffset fd
+        mem STAT_STRUCT_MEM_OFFSET + over
+        fstat syscall2 drop                         ; mem[STAT_STRUCT_OFFSET] should have the stat struct in it)
+        mem ST_MODE_OFFSET + load8 S_IFMT_MASK &
+        dup S_IFDIR == if                           ; is it a directory?
+            2swap dup
+            "cat: " stderr write syscall3 drop
+            mem stderr write syscall3 drop
+            ": Is a directory\n" stderr write syscall3 drop
+            2swap
+        endif
+        dup S_IFCHR == swap S_IFREG == or if        ; is it a file? or a character device?
+            1   while 0 != do
+                dup mem read 1024 rot 2swap syscall3 
+                dup mem stdout write syscall3 drop
+            done
+        endif
+        close syscall1 drop
+        drop 0                                      ; set memoffset to 0
+        swap                                              
+        1 -                                         ; decrement argc, so that the next file is read
+    endif
 done
-3 syscall1 drop                     ;stack> offset2
-mem 1 1 syscall3 drop
-
