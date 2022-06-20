@@ -513,7 +513,7 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
             elif builtin_type == Builtin.OP_PUSH_STR:
                 if (not (op[1][1][2]) in ro_data):
                     ro_data.append(op[1][1][2])
-                str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 1
+                str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 0
                 asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
 
@@ -529,8 +529,8 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
             asm.write("section .rodata\n")              # .ro_data section
             for string in list(enumerate(ro_data)):
                 str_label = "str%d" % (string[0])
-                str_data = string[1] if string[1] else "0x0"
-                asm.write("    " + str_label + ": db " + str_data + ",0x0" + "\n")
+                str_data = string[1] + ",0x0" if string[1] else "0x0"
+                asm.write("    " + str_label + ": db " + str_data + "\n")
         asm.write("segment .bss\n")                 # .bss section
         asm.write("    mem: resb %s\n" % MEMORY_SIZE)
 
@@ -921,10 +921,8 @@ def parse_line(file_path, line_num, line):
                     token_type = "char"
                     token += line[0]
                     line = line[1:]
-                    if (len(token) == 2):
-                        token = "0"
                     try:
-                        assert len(bytes(token, "utf-8").decode("unicode-escape")) <= 3, "ERROR invalid character literal `%s`" % token
+                        assert len(bytes(token, "utf-8").decode("unicode-escape")) == 3, "ERROR invalid character literal `%s`" % token
                     except AssertionError as error_msg:
                         print_compilation_error((((file_path, line_num, col_num), token)), error_msg)
                         exit(1)       
