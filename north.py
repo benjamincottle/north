@@ -65,14 +65,16 @@ class Builtin(Enum):
     OP_IF = auto()
     OP_ELSE = auto()
     OP_ENDIF = auto()
+    OP_SYSCALL_0 = auto()
     OP_SYSCALL_1 = auto()
     OP_SYSCALL_2 = auto()
     OP_SYSCALL_3 = auto()
     OP_SYSCALL_4 = auto()
     OP_SYSCALL_5 = auto()
     OP_SYSCALL_6 = auto()
-
-
+    OP_FUNC_CALL = auto()
+    OP_FUNC_DEF = auto()
+    OP_FUNC_RET = auto()
 
 op_readable = {
     "OP_PRINT": "print",
@@ -124,12 +126,14 @@ op_readable = {
     "OP_IF": "if",
     "OP_ELSE": "else",
     "OP_ENDIF": "endif",
+    "OP_SYSCALL_0": "syscall0",
     "OP_SYSCALL_1": "syscall1",
     "OP_SYSCALL_2": "syscall2",
     "OP_SYSCALL_3": "syscall3",
     "OP_SYSCALL_4": "syscall1",
     "OP_SYSCALL_5": "syscall2",
     "OP_SYSCALL_6": "syscall3",
+    "OP_DEF": "def",
 }
 
 
@@ -144,14 +148,15 @@ def print_compilation_error(token, error_msg):   # ((file, line, col), (token_ty
         print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg), file=sys.stderr)
 
 
-def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
+def compile_to_elf64_asm(program, function_defs, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
     with open(output_file, "w") as asm: 
         ro_data = []
+        start_f_def = True
         asm.write("BITS 64\n")
-        asm.write("segment .text\n")
+        asm.write("section .text\n")
         asm.write("print:\n")
-        asm.write("    mov     r9, 0xcccccccccccccccd\n")
         asm.write("    sub     rsp, 0x28\n")
+        asm.write("    mov     r9, 0xcccccccccccccccd\n")
         asm.write("    mov     BYTE [rsp+0x1f], 0xa\n")
         asm.write("    lea     rcx, [rsp+0x1e]\n")
         asm.write(".L00:\n")
@@ -329,8 +334,9 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    pop     rax\n")
                 asm.write("    push    rax\n")
                 asm.write("    cmp     rax, 0\n")
-                asm.write("    je      .L%d\n" % (op[0] + 1))
+                asm.write("    je      .L%da\n" % (op[0]))
                 asm.write("    push    rax\n")
+                asm.write(".L%da:\n" % (op[0]))
             elif builtin_type == Builtin.OP_MAX:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
@@ -459,6 +465,11 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_ENDIF:
                 pass        
+            elif builtin_type == Builtin.OP_SYSCALL_0:
+                # These are Linux syscalls that utilise no agruments
+                asm.write("    pop     rax\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_SYSCALL_1:
                 # These are Linux syscalls that utilise arg0 (%rdi)
                 asm.write("    pop     rax\n")
@@ -517,25 +528,86 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
 
+# function_defs = { ... , function_name: ([function_name] [args], [returns]), ... }
+            elif builtin_type == Builtin.OP_FUNC_CALL: 
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if args_count > 0:
+                    asm.write("    pop     rdi\n")
+                if args_count > 1:
+                    asm.write("    pop     rsi\n")
+                if args_count > 2:
+                    asm.write("    pop     rdx\n")
+                if args_count > 3:
+                    asm.write("    pop     rcx\n")
+                if args_count > 4:
+                    asm.write("    pop     r8\n")
+                if args_count > 5:
+                    asm.write("    pop     r9\n")
+                if args_count > 6:
+                    assert False, "Too many arguments to function"
+                asm.write("    call    " + function_name + "\n")
+                if returns_count > 0:
+                    asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_FUNC_DEF:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if start_f_def:
+                    start_f_def = False
+                    asm.write(".L%d:\n" % len(program))         # implicit exit       
+                    asm.write("    mov     eax, 0xe7\n")
+                    asm.write("    mov     rdi, 0x0\n")
+                    asm.write("    syscall\n")
+                asm.write("%s:\n" % op[1][1][2])      #TODO: valid function name _ is a problem
+                asm.write("    sub     rsp, 0x28\n")
+                if args_count > 6:
+                    assert False, "Too many arguments to function"
+                if args_count > 5:
+                    asm.write("    push    r9\n")
+                if args_count > 4:
+                    asm.write("    push    r8\n")
+                if args_count > 3:
+                    asm.write("    push    rcx\n")
+                if args_count > 2:
+                    asm.write("    push    rdx\n")
+                if args_count > 1:
+                    asm.write("    push    rsi\n")
+                if args_count > 0:
+                    asm.write("    push    rdi\n")
+
+            elif builtin_type == Builtin.OP_FUNC_RET:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if returns_count > 0:
+                    asm.write("    pop     rax\n")
+                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    ret\n")
             else:
                 assert False, "Unreachable"
 
-        asm.write(".L%d:\n" % len(program))         # implicit exit       
-        asm.write("    mov     eax, 0xe7\n")
-        asm.write("    mov     rdi, 0x0\n")
-        asm.write("    syscall\n")
-
+        if start_f_def:
+            start_f_def = False
+            asm.write(".L%d:\n" % len(program))         # implicit exit       
+            asm.write("    mov     eax, 0xe7\n")
+            asm.write("    mov     rdi, 0x0\n")
+            asm.write("    syscall\n")
         if ro_data != []:
             asm.write("section .rodata\n")              # .ro_data section
             for string in list(enumerate(ro_data)):
                 str_label = "str%d" % (string[0])
                 str_data = string[1] + ",0x0" if string[1] else "0x0"
                 asm.write("    " + str_label + ": db " + str_data + "\n")
-        asm.write("segment .bss\n")                 # .bss section
+        asm.write("section .bss\n")                 # .bss section
         asm.write("    mem: resb %s\n" % MEMORY_SIZE)
 
 
-def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
+def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
     block_stack = []
     required_labels = []
     for op_label in range(len(program)):
@@ -600,8 +672,8 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], (program[if_or_else_loc][1][0], program[if_or_else_loc][1][1], (op_label + 1))) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
-        elif (builtin_type == Builtin.OP_DUPNZ):
-            required_labels.append(op_label + 1)
+        # elif (builtin_type == Builtin.OP_DUPNZ):
+        #     required_labels.append(op_label + 1)
     try:
             assert block_stack == []
     except AssertionError as error_msg:
@@ -614,11 +686,11 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
         print("DEBUG: locate_blocks:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
+    return program, function_defs, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
 
 
-def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, token_data), ... ]
-    program = []
+def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col), (token_type, token_data), ... ]
+    program = []                          # function_defs = { ... , function_name: ([function_name], [args], [returns], [function_tokens]), ... }
     for token in tokens:
         token_loc = token[0] 
         token_type = token[1][0]
@@ -721,6 +793,8 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_ELSE)))
         elif token_data == "endif":
             program.append((token_loc, (token_type, Builtin.OP_ENDIF)))
+        elif token_data == "syscall0":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_0)))
         elif token_data == "syscall1":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL_1)))
         elif token_data == "syscall2":
@@ -738,6 +812,13 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
         elif token_data[0] + token_data[-1] == "\'\'":
             program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
+        elif token_type == "label":
+            if token_data[1] == "start": 
+                program.append((token_loc, (token_type, Builtin.OP_FUNC_DEF, token_data[0])))
+            elif token_data[1] == "end": 
+                program.append((token_loc, (token_type, Builtin.OP_FUNC_RET, token_data[0]))) 
+        elif token_data in function_defs:
+            program.append((token_loc, (token_type, Builtin.OP_FUNC_CALL, token_data)))
         else:
             try:
                 program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, int(token_data))))
@@ -749,7 +830,7 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
         print("DEBUG: parse_tokens:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program     # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
+    return program, function_defs     # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
 
 
 def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, line, col), (token_type, token_data)), ... ]
@@ -828,14 +909,58 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
 
 
+def preprocessor_function(tokens):
+    function_defs = {}
+    function_tokens = []
+    tokens_expanded = []
+    while len(tokens) > 0:
+        token_type = tokens[0][1][0]
+        token_data = tokens[0][1][1]
+        if (token_data == "def"):            
+            function_args = []
+            function_returns = []
+            tokens = tokens[1:]    # remove def
+            function_name = tokens[0][1][1]
+            tokens = tokens[1:]    # remove func_name
+            tokens = tokens[1:]    # remove (
+            while (tokens[0][1][1] != ")"):
+                while (tokens[0][1][1] != "--"):
+                    function_args.append(tokens[0][1][1])
+                    tokens = tokens[1:]    # remove arg
+                tokens = tokens[1:]    # remove -- 
+                while (tokens[0][1][1] != ")"):
+                    function_returns.append(tokens[0][1][1])
+                    tokens = tokens[1:]    # remove return
+                tokens = tokens[1:]    # remove )
+                tokens = tokens[1:]    # remove {
+                function_tokens.append(((tokens[0][0][0], 0, 0), ("label", (function_name, "start"))))
+                while (tokens[0][1][1] != "}"):
+                    function_tokens.append(tokens[0])
+                    tokens = tokens[1:]    # remove function token
+                tokens = tokens[1:]    # remove }
+                function_tokens.append(((tokens[0][0][0], 0, 0), ("label", (function_name, "end"))))
+                break
+            function_defs[function_name] = (function_name, function_args, function_returns)
+
+        else:
+            tokens_expanded.append(tokens[0])
+            tokens = tokens[1:]
+    tokens_expanded = tokens_expanded + function_tokens
+
+
+    if Debug == 3:
+        print("DEBUG: preprocessor_function:", file=sys.stderr)
+        pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
+    return tokens_expanded, function_defs  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
+                                           # function_defs = { ... , function_name: ([function_name] [args], [returns], [function_tokens]), ... }
+
 def preprocessor_define(tokens):
     tokens_expanded = []
-    token_index = 0
     defines = {}
     while len(tokens) > 0:
         token_type = tokens[0][1][0]
         token_data = tokens[0][1][1]
-        parent_file = tokens[0][0][0]
         if (token_data == "#define"):
             try:     # Check for missing define_name 
                 assert (len(tokens) >= 2) , "ERROR `#define` missing define name"
@@ -871,7 +996,7 @@ def preprocessor_define(tokens):
         pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
-            
+
 
 def parse_line(file_path, line_num, line):
     token = ""
@@ -939,6 +1064,17 @@ def parse_line(file_path, line_num, line):
                 token += line[0]
                 line = line[1:]
                 cur_column += 1
+        elif line[0] in ["(", ")", "{", "}"]:   # parenthesis, braces
+            if token != "":
+                yield ((file_path, line_num, col_num), (token_type, token))
+                token = ""
+            token_type = "keyword"    
+            token += line[0]
+            line = line[1:]
+            col_num = cur_column
+            yield ((file_path, line_num, col_num), (token_type, token))
+            cur_column += 1
+            token = ""
         elif line[0].isspace():                 # whitespace marks end of token
             if token.isdecimal():
                 token_type = "uint"
@@ -1037,11 +1173,12 @@ if __name__ == "__main__":
         cleanup_command.remove(asm_file)
 
     tokens = load_tokens(input_file)                                            # load tokens from input_file
-    # tokens_included = preprocessor_include(tokens, include_depth=[])            # recursively process includes
-    tokens_included = preprocessor_include(tokens, include_depth=[])                    # recursively process includes
-    tokens_processed = preprocessor_define(tokens_included)                     # process defines
-    program, required_labels = locate_blocks(parse_tokens(tokens_processed))     # parse tokens to program
-    compile_to_elf64_asm(program, required_labels, asm_file)                    # compile to asm
+    tokens_pre1 = preprocessor_include(tokens, include_depth=[])                # recursively process includes
+    tokens_pre2 = preprocessor_define(tokens_pre1)                              # process defines
+    tokens_pre3, function_defs = preprocessor_function(tokens_pre2)             # process functions
+    tokens_pre4, function_defs = parse_tokens(tokens_pre3, function_defs)                      # parse tokens
+    program, function_defs, required_labels = locate_blocks(tokens_pre4, function_defs)                       # cross-reference keywords
+    compile_to_elf64_asm(program, function_defs, required_labels, asm_file)                    # compile to asm
     run_cmd(nasm_command)                                                       # assemble to elf
     run_cmd(ld_command)                                                         # link to executable
     

@@ -1,0 +1,22 @@
+ def squared ( a -- a_squared ) {
+    dup *
+}
+
+def sumofsquares ( a b -- c ) {
+    squared
+    swap
+    squared
+    + 
+}
+
+
+
+def a3drop ( a b c -- ) {
+    drop drop drop
+}
+
+20 squared print
+
+2 3 sumofsquares print
+
+8 1 2 3 a3drop print
