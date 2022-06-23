@@ -151,7 +151,7 @@ def print_compilation_error(token, error_msg):   # ((file, line, col), (token_ty
 def compile_to_elf64_asm(program, function_defs, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
     with open(output_file, "w") as asm: 
         ro_data = []
-        start_f_def = True
+        implicit_exit_req = True
         asm.write("BITS 64\n")
         asm.write("section .text\n")
         asm.write("print:\n")
@@ -528,7 +528,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
 
-# function_defs = { ... , function_name: ([function_name] [args], [returns]), ... }
+# function_defs = { ... , function_name: ([valid_function_name] [args], [returns]), ... }
             elif builtin_type == Builtin.OP_FUNC_CALL: 
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
@@ -548,21 +548,32 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                     asm.write("    pop     r9\n")
                 if args_count > 6:
                     assert False, "Too many arguments to function"
-                asm.write("    call    " + function_name + "\n")
+                asm.write("    call    %s\n" % (function_name))
                 if returns_count > 0:
                     asm.write("    push    rax\n")
+
+            elif builtin_type == Builtin.OP_FUNC_RET:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if returns_count > 0:
+                    asm.write("    pop     rax\n")
+                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    ret\n")
+
             elif builtin_type == Builtin.OP_FUNC_DEF:
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
                 args_count = len(function[1])
                 returns_count = len(function[2])
-                if start_f_def:
-                    start_f_def = False
-                    asm.write(".L%d:\n" % len(program))         # implicit exit       
+                if implicit_exit_req:
+                    implicit_exit_req = False
+                    asm.write(".L%d:\n" % len(program))         # implicit exit       #TODO len(program) is not correct
                     asm.write("    mov     eax, 0xe7\n")
                     asm.write("    mov     rdi, 0x0\n")
                     asm.write("    syscall\n")
-                asm.write("%s:\n" % op[1][1][2])      #TODO: valid function name _ is a problem
+                asm.write("%s:\n" % function_name)
                 asm.write("    sub     rsp, 0x28\n")
                 if args_count > 6:
                     assert False, "Too many arguments to function"
@@ -579,20 +590,11 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 if args_count > 0:
                     asm.write("    push    rdi\n")
 
-            elif builtin_type == Builtin.OP_FUNC_RET:
-                function = function_defs[op[1][1][2]]
-                function_name = function[0]
-                args_count = len(function[1])
-                returns_count = len(function[2])
-                if returns_count > 0:
-                    asm.write("    pop     rax\n")
-                asm.write("    add     rsp, 0x28\n") 
-                asm.write("    ret\n")
             else:
                 assert False, "Unreachable"
 
-        if start_f_def:
-            start_f_def = False
+        if implicit_exit_req:
+            implicit_exit_req = False
             asm.write(".L%d:\n" % len(program))         # implicit exit       
             asm.write("    mov     eax, 0xe7\n")
             asm.write("    mov     rdi, 0x0\n")
@@ -672,8 +674,6 @@ def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], (program[if_or_else_loc][1][0], program[if_or_else_loc][1][1], (op_label + 1))) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
-        # elif (builtin_type == Builtin.OP_DUPNZ):
-        #     required_labels.append(op_label + 1)
     try:
             assert block_stack == []
     except AssertionError as error_msg:
@@ -813,9 +813,9 @@ def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col),
         elif token_data[0] + token_data[-1] == "\'\'":
             program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
         elif token_type == "label":
-            if token_data[1] == "start": 
+            if token_data[1] == "f_def": 
                 program.append((token_loc, (token_type, Builtin.OP_FUNC_DEF, token_data[0])))
-            elif token_data[1] == "end": 
+            elif token_data[1] == "f_ret": 
                 program.append((token_loc, (token_type, Builtin.OP_FUNC_RET, token_data[0]))) 
         elif token_data in function_defs:
             program.append((token_loc, (token_type, Builtin.OP_FUNC_CALL, token_data)))
@@ -869,18 +869,16 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
             # TODO: implement -I for additonal search paths
-            search_path = "."
-            # This is a local include
             if (next_token_data[0] + next_token_data[-1]) == "\"\"":
+                # This is a local include
+                search_path = "."
                 if (not (parent_file.find("/") == -1)):
                     search_path = parent_file[:parent_file.rfind("/")]
                 include_file_path = search_path + "/" + include_file
-            # This is a system include
             elif (next_token_data[0] + next_token_data[-1]) == "<>":
-                include_type = "system"
-                # TODO: setup filepath for include_file based on system include_type 
-                include_file_path = next_token_data[1:-1]
-                assert False, "ERROR `#include` system includes not implemented"
+                # This is a system include
+                # TODO: search_path currently is /lib in north.py execution location
+                include_file_path = "./lib/" + include_file + ".north"
             else:
                 print_compilation_error(tokens[1], "ERROR invalid include `%s`" % next_token_data)
                 exit(1)
@@ -921,6 +919,16 @@ def preprocessor_function(tokens):
             function_returns = []
             tokens = tokens[1:]    # remove def
             function_name = tokens[0][1][1]
+            function_name_loc = tokens[0][0]
+            # Valid characters in labels are letters, numbers, _, $, #, @, ~, ., and ?
+            # The only characters which may be used as the first character of an identifier are letters, _ and ?
+            valid_function_name = []
+            for c in function_name:
+                if c.isalpha() or c.isdecimal() or c in ["_", "$", "#", "@", "~", ".", "?"]:
+                    valid_function_name.append(c)
+                else:
+                    valid_function_name.append("".join("{:02x}".format(ord(c))))
+            valid_function_name = "f" + "".join(valid_function_name)
             tokens = tokens[1:]    # remove func_name
             tokens = tokens[1:]    # remove (
             while (tokens[0][1][1] != ")"):
@@ -933,14 +941,14 @@ def preprocessor_function(tokens):
                     tokens = tokens[1:]    # remove return
                 tokens = tokens[1:]    # remove )
                 tokens = tokens[1:]    # remove {
-                function_tokens.append(((tokens[0][0][0], 0, 0), ("label", (function_name, "start"))))
+                function_tokens.append((function_name_loc, ("label", (function_name, "f_def"))))
                 while (tokens[0][1][1] != "}"):
                     function_tokens.append(tokens[0])
                     tokens = tokens[1:]    # remove function token
                 tokens = tokens[1:]    # remove }
-                function_tokens.append(((tokens[0][0][0], 0, 0), ("label", (function_name, "end"))))
+                function_tokens.append((function_name_loc, ("label", (function_name, "f_ret"))))
                 break
-            function_defs[function_name] = (function_name, function_args, function_returns)
+            function_defs[function_name] = (valid_function_name, function_args, function_returns)
 
         else:
             tokens_expanded.append(tokens[0])
