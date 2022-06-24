@@ -1,0 +1,10 @@
+:i argc 0
+:b stdin 17
+Oscar the Smooch
+
+:i returncode 0
+:b stdout 75
+Enter your preferred name: Hello Oscar the Smooch! That's a lovely name :P
+
+:b stderr 0
+

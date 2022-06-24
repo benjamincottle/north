@@ -1,14 +1,14 @@
 :i argc 1
-:b arg0 14
-arg1 arg2 arg3
+:b arg0 22
+cheese sausage mustard
 :b stdin 0
 
 :i returncode 0
-:b stdout 24
+:b stdout 32
 ./output
-arg1
-arg2
-arg3
+cheese
+sausage
+mustard
 
 :b stderr 0
 

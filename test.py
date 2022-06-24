@@ -91,10 +91,11 @@ def save_test_case(file_path: str,
 
 @dataclass
 class RunStats:
+    passed: int = 0
     failed: int = 0
     ignored: int = 0
     failed_files: List[str] = field(default_factory=list)
-
+    ignored_files: List[str] = field(default_factory=list)
 
 def create_folder(folder: str):
     if not path.exists(folder):
@@ -110,6 +111,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
     tc = load_test_case(tc_path)
 
     error = False
+    ignored = False
 
     if tc is not None:
         if len(tc.argv) != 0:
@@ -128,16 +130,21 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
             print("    stderr: \n%s" % com.stderr.decode("utf-8"))
             error = True
             stats.failed += 1
+        else:
+            stats.passed += 1
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
         com = cmd_run_echoed([sys.executable, "north.py", "-o", "output", file_path], capture_output=True)
         if com.returncode != 0:
             error = True
             stats.failed += 1
+        ignored = True
         stats.ignored += 1
 
     if error:
         stats.failed_files.append(file_path)
+    if ignored:
+        stats.ignored_files.append(file_path)
 
 
 def run_test_for_folder(folder: str):
@@ -146,15 +153,19 @@ def run_test_for_folder(folder: str):
         if entry.is_file() and entry.path.endswith(NORTH_EXT):
             run_test_for_file(entry.path, stats)
     print()
-    print(" Failed: %d, Ignored: %d" % (stats.failed, stats.ignored))
+    print(" Passed: %d, Failed: %d, Ignored: %d" % (stats.passed, stats.failed, stats.ignored))
     print()
     if stats.failed != 0:
         print("Failed files:")
-        print()
         for failed_file in stats.failed_files:
             print(f"{failed_file}")
+        print()
+    if stats.ignored != 0:
+        print("Ignored files:")
+        for ignored_file in stats.ignored_files:
+            print(f"{ignored_file}")
+        print()
         exit(1)
-
 
 def update_input_for_file(file_path: str, argv: List[str]):
     assert file_path.endswith(NORTH_EXT)
