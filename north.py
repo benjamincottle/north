@@ -914,7 +914,38 @@ def preprocessor_function(tokens):
     while len(tokens) > 0:
         token_type = tokens[0][1][0]
         token_data = tokens[0][1][1]
-        if (token_data == "def"):            
+        if (token_data == "def"):   #TODO: github copilot wrote garbage here
+            try:
+                assert (len(tokens) >= 2), "ERROR invalid function definition, expected function name"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            next_token = tokens[1]
+            try:
+                assert (next_token[1][0] == "keyword"), "ERROR invalid function name type `%s`, expected `keyword`" % (tokens[0][1][0])
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[1], error_msg)
+                exit(1)
+            try: 
+                assert (not (next_token[1][1] in function_defs)), "ERROR duplicate function name `%s`" % next_token[1][1]
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[1], error_msg)
+                exit(1)
+            try: 
+                assert (len(tokens) >= 3) , "ERROR invalid function definition"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            try: 
+                assert (tokens[2][1][1] == "(") , "ERROR invalid function argument definiton, expected `(`"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[2], error_msg)
+                exit(1)
+            try: 
+                assert (len(tokens) > 7) , "ERROR invalid function definition"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
             function_args = []
             function_returns = []
             tokens = tokens[1:]    # remove def
@@ -931,18 +962,52 @@ def preprocessor_function(tokens):
             valid_function_name = "f" + "".join(valid_function_name)
             tokens = tokens[1:]    # remove func_name
             tokens = tokens[1:]    # remove (
-            while (tokens[0][1][1] != ")"):
+            while (tokens[0][1][1] != "}"):
                 while (tokens[0][1][1] != "--"):
                     function_args.append(tokens[0][1][1])
+                    try:
+                        assert tokens[0][1][1] != ")", "ERROR invalid function argument definiton, expected `--` before `)`"
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    try:
+                        assert tokens[0][1][0] == "keyword", "ERROR invalid function argument type `%s`, expected `keyword`" % (tokens[0][1][0])
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
                     tokens = tokens[1:]    # remove arg
                 tokens = tokens[1:]    # remove -- 
                 while (tokens[0][1][1] != ")"):
                     function_returns.append(tokens[0][1][1])
+                    try:
+                        assert tokens[0][1][1] != "{", "ERROR invalid function argument definiton, expected `)` before `{`"
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    try:
+                        assert tokens[0][1][0] == "keyword", "ERROR invalid function return type `%s`, expected `keyword`" % (tokens[0][1][0])
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
                     tokens = tokens[1:]    # remove return
                 tokens = tokens[1:]    # remove )
+                try:
+                    assert tokens[0][1][1] == "{", "ERROR invalid function definition, expected `{`"
+                except AssertionError as error_msg:
+                    print_compilation_error(tokens[0], error_msg)
+                    exit(1)
+                function_body_loc = tokens[0][0]
                 tokens = tokens[1:]    # remove {
                 function_tokens.append((function_name_loc, ("label", (function_name, "f_def"))))
-                while (tokens[0][1][1] != "}"):
+                try:
+                    assert tokens[0][1][1] != "{", "ERROR invalid function definition, `{` unexpected"
+                except AssertionError as error_msg:
+                    print_compilation_error(tokens[0], error_msg)
+                    exit(1)
+                while tokens[0][1][1] != "}":
+                    if (len(tokens) == 1) and (tokens[0][1][1] != "}"):
+                        print_compilation_error((function_body_loc, None), "ERROR invalid function definition, unmatched `{`")
+                        exit(1)
                     function_tokens.append(tokens[0])
                     tokens = tokens[1:]    # remove function token
                 tokens = tokens[1:]    # remove }
@@ -1073,10 +1138,20 @@ def parse_line(file_path, line_num, line):
                 line = line[1:]
                 cur_column += 1
         elif line[0] in ["(", ")", "{", "}"]:   # parenthesis, braces
-            if token != "":
+            if token != "":    # no whitespace between tokens, yield token first
+                if token.isdecimal():
+                    token_type = "uint"
+                elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
+                    token_type = "stackop"
+                elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+                    token_type = "builtin"
+                elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
+                    token_type = "operator"
+                else:
+                    token_type = "keyword"
                 yield ((file_path, line_num, col_num), (token_type, token))
                 token = ""
-            token_type = "keyword"    
+            token_type = "builtin"    
             token += line[0]
             line = line[1:]
             col_num = cur_column
@@ -1086,6 +1161,12 @@ def parse_line(file_path, line_num, line):
         elif line[0].isspace():                 # whitespace marks end of token
             if token.isdecimal():
                 token_type = "uint"
+            elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
+                token_type = "stackop"
+            elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+                token_type = "builtin"
+            elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
+                token_type = "operator"
             else:
                 token_type = "keyword"
             line = line[1:]
@@ -1107,6 +1188,12 @@ def parse_line(file_path, line_num, line):
     if token != "":
         if token.isdecimal():
             token_type = "uint"
+        elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
+            token_type = "stackop"
+        elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+            token_type = "builtin"
+        elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
+            token_type = "operator"
         else:
             token_type = "keyword"
         yield ((file_path, line_num, col_num), (token_type, token))
@@ -1179,6 +1266,7 @@ if __name__ == "__main__":
 
     if Debug in [1, 2]:
         cleanup_command.remove(asm_file)
+
 
     tokens = load_tokens(input_file)                                            # load tokens from input_file
     tokens_pre1 = preprocessor_include(tokens, include_depth=[])                # recursively process includes

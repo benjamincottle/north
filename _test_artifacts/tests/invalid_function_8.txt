@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 152
+     def a ( a a --  2  ) {
+                     ^
+./tests/invalid_function_8.north:2:21: ERROR invalid function return type `uint`, expected `keyword`
+
