@@ -76,65 +76,80 @@ class Builtin(Enum):
     OP_FUNC_DEF = auto()
     OP_FUNC_RET = auto()
 
-op_readable = {
-    "OP_PRINT": "print",
-    "OP_ADD": "+",
-    "OP_SUB": "-",
-    "OP_MUL": "*",
-    "OP_DIV": "/",
-    "OP_MOD": "%",
-    "OP_MEM": "mem",
-    "OP_STORE8": "store8",
-    "OP_STORE16": "store16",
-    "OP_STORE32": "store32",
-    "OP_STORE64": "store64",
-    "OP_LOAD8": "load8",
-    "OP_LOAD16": "load16",
-    "OP_LOAD32": "load32",
-    "OP_LOAD64": "load64",
-    "OP_EXIT": "exit",
-    "OP_DUP": "dup",
-    "OP_2DUP": "2dup",
-    "OP_DROP": "drop",
-    "OP_2DROP": "2drop",
-    "OP_OVER": "over",
-    "OP_2OVER": "2over",
-    "OP_SWAP": "swap",
-    "OP_2SWAP": "2swap",
-    "OP_ROT": "rot",
-    "OP_DUPNZ": "dupnz",
-    "OP_MAX": "max",
-    "OP_MIN": "min",
-    "OP_EQUAL": "==",
-    "OP_NOTEQUAL": "!=",
-    "OP_GT": ">",
-    "OP_GE": "<=",
-    "OP_LT": "<",
-    "OP_LE": "<=",
-    "OP_LOGICAL_AND": "and",
-    "OP_LOGICAL_OR": "or",
-    "OP_LOGICAL_NOT": "not",
-    "OP_BITWISE_AND": "&",
-    "OP_BITWISE_OR": "|",
-    "OP_BITWISE_NOT": "~",
-    "OP_XOR": "^",
-    "OP_LSHIFT": "<<",
-    "OP_RSHIFT": ">>",
-    "OP_WHILE": "while",
-    "OP_DO": "do",
-    "OP_DONE": "done",
-    "OP_IF": "if",
-    "OP_ELSE": "else",
-    "OP_ENDIF": "endif",
-    "OP_SYSCALL_0": "syscall0",
-    "OP_SYSCALL_1": "syscall1",
-    "OP_SYSCALL_2": "syscall2",
-    "OP_SYSCALL_3": "syscall3",
-    "OP_SYSCALL_4": "syscall1",
-    "OP_SYSCALL_5": "syscall2",
-    "OP_SYSCALL_6": "syscall3",
-    "OP_DEF": "def",
-}
+
+class Token(Enum):
+    OP_PRINT = "print"
+    OP_ADD = "+"
+    OP_SUB = "-"
+    OP_MUL = "*"
+    OP_DIV = "/"
+    OP_MOD = "%"
+    OP_MEM = "mem"
+    OP_STORE8 = "store8"
+    OP_STORE16 = "store16"
+    OP_STORE32 = "store32"
+    OP_STORE64 = "store64"
+    OP_LOAD8 = "load8"
+    OP_LOAD16 = "load16"
+    OP_LOAD32 = "load32"
+    OP_LOAD64 = "load64"
+    OP_EXIT = "exit"
+    OP_DUP = "dup"
+    OP_2DUP = "2dup"
+    OP_DROP = "drop"
+    OP_2DROP = "2drop"
+    OP_OVER = "over"
+    OP_2OVER = "2over"
+    OP_SWAP = "swap"
+    OP_2SWAP = "2swap"
+    OP_ROT = "rot"
+    OP_DUPNZ = "dupnz"
+    OP_MAX = "max"
+    OP_MIN = "min"
+    OP_EQUAL = "=="
+    OP_NOTEQUAL = "!="
+    OP_GT = ">"
+    OP_GE = ">="
+    OP_LT = "<"
+    OP_LE = "<="
+    OP_LOGICAL_AND = "and"
+    OP_LOGICAL_AND_ALT = "&&"
+    OP_LOGICAL_OR = "or"
+    OP_LOGICAL_OR_ALT = "||",   
+    OP_LOGICAL_NOT = "not"
+    OP_LOGICAL_NOT_ALT = "!",   
+    OP_BITWISE_AND = "&"
+    OP_BITWISE_OR = "|"
+    OP_BITWISE_NOT = "~"
+    OP_XOR = "^"
+    OP_LSHIFT = "<<"
+    OP_RSHIFT = ">>"
+    OP_WHILE = "while"
+    OP_DO = "do"
+    OP_DONE = "done"
+    OP_IF = "if"
+    OP_ELSE = "else"
+    OP_ENDIF = "endif"
+    OP_SYSCALL_0 = "syscall0"
+    OP_SYSCALL_1 = "syscall1"
+    OP_SYSCALL_2 = "syscall2"
+    OP_SYSCALL_3 = "syscall3"
+    OP_SYSCALL_4 = "syscall1"
+    OP_SYSCALL_5 = "syscall2"
+    OP_SYSCALL_6 = "syscall3"
+    OP_DEF = "def"
+    OP_INCLUDE = "#include"
+    OP_DEFINE = "#define"
+    @classmethod
+    def is_member(enum, value):
+        try:
+            enum(value)
+        except ValueError:
+            return False
+        return True
+    @classmethod
+    def readable(enum, name):
+        return enum.__members__[name].value
 
 
 def print_compilation_error(token, error_msg):   # ((file, line, col), (token_type, builtin_type, [token_data])), "string"
@@ -527,8 +542,6 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 0
                 asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
-
-# function_defs = { ... , function_name: ([valid_function_name] [args], [returns]), ... }
             elif builtin_type == Builtin.OP_FUNC_CALL: 
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
@@ -551,7 +564,6 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    call    %s\n" % (function_name))
                 if returns_count > 0:
                     asm.write("    push    rax\n")
-
             elif builtin_type == Builtin.OP_FUNC_RET:
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
@@ -561,7 +573,6 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                     asm.write("    pop     rax\n")
                 asm.write("    add     rsp, 0x28\n") 
                 asm.write("    ret\n")
-
             elif builtin_type == Builtin.OP_FUNC_DEF:
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
@@ -589,10 +600,8 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                     asm.write("    push    rsi\n")
                 if args_count > 0:
                     asm.write("    push    rdi\n")
-
             else:
                 assert False, "Unreachable"
-
         if implicit_exit_req:
             implicit_exit_req = False
             asm.write(".L%d:\n" % len(program))         # implicit exit       
@@ -623,20 +632,20 @@ def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_
             try:
                 do_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
             try:
                 while_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -650,10 +659,10 @@ def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_
             try:
                 if_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -664,10 +673,10 @@ def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_
             try:
                 if_or_else_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -679,7 +688,7 @@ def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_
     except AssertionError as error_msg:
         unmatched_token = program[block_stack.pop()]
         builtin_type = unmatched_token[1][1]
-        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % op_readable[unmatched_token[1][1].name])
+        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % Token.readable(unmatched_token[1][1].name))
         exit(1)
 
     if Debug == 3:
@@ -1141,12 +1150,8 @@ def parse_line(file_path, line_num, line):
             if token != "":    # no whitespace between tokens, yield token first
                 if token.isdecimal():
                     token_type = "uint"
-                elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
-                    token_type = "stackop"
-                elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+                elif Token.is_member(token):  
                     token_type = "builtin"
-                elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
-                    token_type = "operator"
                 else:
                     token_type = "keyword"
                 yield ((file_path, line_num, col_num), (token_type, token))
@@ -1161,12 +1166,8 @@ def parse_line(file_path, line_num, line):
         elif line[0].isspace():                 # whitespace marks end of token
             if token.isdecimal():
                 token_type = "uint"
-            elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
-                token_type = "stackop"
-            elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+            elif Token.is_member(token):  
                 token_type = "builtin"
-            elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
-                token_type = "operator"
             else:
                 token_type = "keyword"
             line = line[1:]
@@ -1188,12 +1189,8 @@ def parse_line(file_path, line_num, line):
     if token != "":
         if token.isdecimal():
             token_type = "uint"
-        elif token in ["dup", "2dup", "drop", "2drop", "over", "2over", "swap", "2swap", "rot", "dupnz"]:
-            token_type = "stackop"
-        elif token in ["--", "min", "max", "and", "or", "not", "if", "else", "endif", "while", "do", "done", "print", "syscall0", "syscall0", "syscall1", "syscall2", "syscall3", "syscall4", "syscall5", "syscall6", "exit", "mem", "load8", "store8", "load16", "store16", "load32", "store32", "load64", "store64", "def"]:
+        elif Token.is_member(token):  
             token_type = "builtin"
-        elif token in ["!=", "==", ">", ">=", "<", "<=", "&&", "||", "!", "+", "-", "/", "*", "%", "&", "|", "~", "^", "<<", ">>"]:
-            token_type = "operator"
         else:
             token_type = "keyword"
         yield ((file_path, line_num, col_num), (token_type, token))
@@ -1269,12 +1266,12 @@ if __name__ == "__main__":
 
 
     tokens = load_tokens(input_file)                                            # load tokens from input_file
-    tokens_pre1 = preprocessor_include(tokens, include_depth=[])                # recursively process includes
-    tokens_pre2 = preprocessor_define(tokens_pre1)                              # process defines
-    tokens_pre3, function_defs = preprocessor_function(tokens_pre2)             # process functions
-    tokens_pre4, function_defs = parse_tokens(tokens_pre3, function_defs)                      # parse tokens
-    program, function_defs, required_labels = locate_blocks(tokens_pre4, function_defs)                       # cross-reference keywords
-    compile_to_elf64_asm(program, function_defs, required_labels, asm_file)                    # compile to asm
+    tokens_post_include = preprocessor_include(tokens, include_depth=[])        # recursively process includes
+    tokens_post_define = preprocessor_define(tokens_post_include)               # process defines
+    tokens_post_function, function_defs = preprocessor_function(tokens_post_define) # process functions
+    tokens_post_parse, function_defs = parse_tokens(tokens_post_function, function_defs) # parse tokens
+    program, function_defs, required_labels = locate_blocks(tokens_post_parse, function_defs) # cross-reference keywords
+    compile_to_elf64_asm(program, function_defs, required_labels, asm_file)     # compile to asm
     run_cmd(nasm_command)                                                       # assemble to elf
     run_cmd(ld_command)                                                         # link to executable
     

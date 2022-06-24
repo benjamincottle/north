@@ -49,11 +49,11 @@
 				"name": "support.function.north"
 			},
 			{
-				"match": "syscall1|syscall2|syscall3|syscall4|syscall5|syscall6|print|exit",
+				"match": "syscall0|syscall1|syscall2|syscall3|syscall4|syscall5|syscall6|print|exit",
 				"name": "keyword.operator.system.north"
 			},
 			{
-				"match": "#include|#define",
+				"match": "#include|#define|def",
 				"name": "meta.preprocessor.string.north"
 			}
 			]
