@@ -1,0 +1,12 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 0
+:b stdout 30
+400
+13
+8
+strings do not match
+
+:b stderr 0
+

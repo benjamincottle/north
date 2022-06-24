@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 142
+     def a ( a -- a ) { {
+                        ^
+./tests/invalid_function_11.north:2:24: ERROR invalid function definition, `{` unexpected
+

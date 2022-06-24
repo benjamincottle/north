@@ -1,0 +1,31 @@
+; stdlib.north
+
+def squared ( a -- a_squared ) {
+    dup *
+}
+
+def sum_of_squares ( a b -- c ) {
+    squared
+    swap
+    squared
+    + 
+}
+
+def 3drop ( a b c -- ) {
+    drop drop drop
+}
+
+def strcmp ( a b -- c ) {
+    0 rot rot                                  ;> Flag=False &stra_ptr &strb_ptr
+    while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do  ; while (flag is not True) and (str_a[i] != '\0') and (str_b[i] != '\0')
+        2dup load8 swap load8 swap != if
+            rot drop 1 rot rot
+        endif
+        1 + swap 1 + swap
+    done 
+    load8 swap load8 swap != or 0 == if
+        1   ; return true
+    else
+        0   ; return false
+    endif  
+}

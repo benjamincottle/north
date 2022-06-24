@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 109
+        1 +
+        ^
+./tests/invalid_function_10.north:3:8: ERROR invalid function definition, expected `{`
+

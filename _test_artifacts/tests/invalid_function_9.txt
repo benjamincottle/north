@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 166
+     def a ( a a --  a sq   {
+                            ^
+./tests/invalid_function_9.north:2:28: ERROR invalid function argument definiton, expected `)` before `{`
+

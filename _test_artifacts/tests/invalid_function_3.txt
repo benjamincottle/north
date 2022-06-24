@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 104
+def name (a b -- c ) {
+    ^
+./tests/invalid_function_3.north:4:4: ERROR duplicate function name `name`
+

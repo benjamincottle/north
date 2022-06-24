@@ -1,15 +1,20 @@
-!=  ==  >  >=  <  <= min  max and 
-&& or || not ! 
-if else endif while do done 
-print syscall exit 
-dup 2dup drop 2drop over 2over swap
-2swap rot dupnz
-+ - / * %
+print + - / * % 
+mem store8 store16 store32 store64 load8 load16 load32 load64
+exit 
+dup 2dup drop 2drop over 2over swap 2swap rot dupnz
+min max == != > >= < <=  
+and &&   
+or || 
+not !
 & | ~ ^ << >>
-mem load8 store8 load16 store16 load32 
-store32 load64 store64
+while do done if else endif syscall0 syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 def
+#include #define
+
+
 99 "String!\n"
 'a' 'b' 'c' 
 #include "comments.north"
 #include <std.north>
+#define
+def ( -- ) { }
 invalid

@@ -1,0 +1,20 @@
+#include <stdlib>
+
+#define write 1
+#define stdout 1
+                                    
+
+20 squared print
+2 3 sum_of_squares print
+8 1 2 3 3drop print
+
+"here" swap drop ;> str_len &here_ptr
+"there" swap drop ;> str_len &here_ptr ;> str_len &there_ptr
+
+strcmp if 
+    "strings match\n" stdout write syscall3 drop
+else
+    "strings do not match\n" stdout write syscall3 drop
+endif
+
+

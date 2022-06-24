@@ -65,72 +65,91 @@ class Builtin(Enum):
     OP_IF = auto()
     OP_ELSE = auto()
     OP_ENDIF = auto()
+    OP_SYSCALL_0 = auto()
     OP_SYSCALL_1 = auto()
     OP_SYSCALL_2 = auto()
     OP_SYSCALL_3 = auto()
     OP_SYSCALL_4 = auto()
     OP_SYSCALL_5 = auto()
     OP_SYSCALL_6 = auto()
+    OP_FUNC_CALL = auto()
+    OP_FUNC_DEF = auto()
+    OP_FUNC_RET = auto()
 
 
-
-op_readable = {
-    "OP_PRINT": "print",
-    "OP_ADD": "+",
-    "OP_SUB": "-",
-    "OP_MUL": "*",
-    "OP_DIV": "/",
-    "OP_MOD": "%",
-    "OP_MEM": "mem",
-    "OP_STORE8": "store8",
-    "OP_STORE16": "store16",
-    "OP_STORE32": "store32",
-    "OP_STORE64": "store64",
-    "OP_LOAD8": "load8",
-    "OP_LOAD16": "load16",
-    "OP_LOAD32": "load32",
-    "OP_LOAD64": "load64",
-    "OP_EXIT": "exit",
-    "OP_DUP": "dup",
-    "OP_2DUP": "2dup",
-    "OP_DROP": "drop",
-    "OP_2DROP": "2drop",
-    "OP_OVER": "over",
-    "OP_2OVER": "2over",
-    "OP_SWAP": "swap",
-    "OP_2SWAP": "2swap",
-    "OP_ROT": "rot",
-    "OP_DUPNZ": "dupnz",
-    "OP_MAX": "max",
-    "OP_MIN": "min",
-    "OP_EQUAL": "==",
-    "OP_NOTEQUAL": "!=",
-    "OP_GT": ">",
-    "OP_GE": "<=",
-    "OP_LT": "<",
-    "OP_LE": "<=",
-    "OP_LOGICAL_AND": "and",
-    "OP_LOGICAL_OR": "or",
-    "OP_LOGICAL_NOT": "not",
-    "OP_BITWISE_AND": "&",
-    "OP_BITWISE_OR": "|",
-    "OP_BITWISE_NOT": "~",
-    "OP_XOR": "^",
-    "OP_LSHIFT": "<<",
-    "OP_RSHIFT": ">>",
-    "OP_WHILE": "while",
-    "OP_DO": "do",
-    "OP_DONE": "done",
-    "OP_IF": "if",
-    "OP_ELSE": "else",
-    "OP_ENDIF": "endif",
-    "OP_SYSCALL_1": "syscall1",
-    "OP_SYSCALL_2": "syscall2",
-    "OP_SYSCALL_3": "syscall3",
-    "OP_SYSCALL_4": "syscall1",
-    "OP_SYSCALL_5": "syscall2",
-    "OP_SYSCALL_6": "syscall3",
-}
+class Token(Enum):
+    OP_PRINT = "print"
+    OP_ADD = "+"
+    OP_SUB = "-"
+    OP_MUL = "*"
+    OP_DIV = "/"
+    OP_MOD = "%"
+    OP_MEM = "mem"
+    OP_STORE8 = "store8"
+    OP_STORE16 = "store16"
+    OP_STORE32 = "store32"
+    OP_STORE64 = "store64"
+    OP_LOAD8 = "load8"
+    OP_LOAD16 = "load16"
+    OP_LOAD32 = "load32"
+    OP_LOAD64 = "load64"
+    OP_EXIT = "exit"
+    OP_DUP = "dup"
+    OP_2DUP = "2dup"
+    OP_DROP = "drop"
+    OP_2DROP = "2drop"
+    OP_OVER = "over"
+    OP_2OVER = "2over"
+    OP_SWAP = "swap"
+    OP_2SWAP = "2swap"
+    OP_ROT = "rot"
+    OP_DUPNZ = "dupnz"
+    OP_MAX = "max"
+    OP_MIN = "min"
+    OP_EQUAL = "=="
+    OP_NOTEQUAL = "!="
+    OP_GT = ">"
+    OP_GE = ">="
+    OP_LT = "<"
+    OP_LE = "<="
+    OP_LOGICAL_AND = "and"
+    OP_LOGICAL_AND_ALT = "&&"
+    OP_LOGICAL_OR = "or"
+    OP_LOGICAL_OR_ALT = "||",   
+    OP_LOGICAL_NOT = "not"
+    OP_LOGICAL_NOT_ALT = "!",   
+    OP_BITWISE_AND = "&"
+    OP_BITWISE_OR = "|"
+    OP_BITWISE_NOT = "~"
+    OP_XOR = "^"
+    OP_LSHIFT = "<<"
+    OP_RSHIFT = ">>"
+    OP_WHILE = "while"
+    OP_DO = "do"
+    OP_DONE = "done"
+    OP_IF = "if"
+    OP_ELSE = "else"
+    OP_ENDIF = "endif"
+    OP_SYSCALL_0 = "syscall0"
+    OP_SYSCALL_1 = "syscall1"
+    OP_SYSCALL_2 = "syscall2"
+    OP_SYSCALL_3 = "syscall3"
+    OP_SYSCALL_4 = "syscall1"
+    OP_SYSCALL_5 = "syscall2"
+    OP_SYSCALL_6 = "syscall3"
+    OP_DEF = "def"
+    OP_INCLUDE = "#include"
+    OP_DEFINE = "#define"
+    @classmethod
+    def is_member(enum, value):
+        try:
+            enum(value)
+        except ValueError:
+            return False
+        return True
+    @classmethod
+    def readable(enum, name):
+        return enum.__members__[name].value
 
 
 def print_compilation_error(token, error_msg):   # ((file, line, col), (token_type, builtin_type, [token_data])), "string"
@@ -144,14 +163,15 @@ def print_compilation_error(token, error_msg):   # ((file, line, col), (token_ty
         print("%s:%d:%d: %s" % (token_loc[0], token_loc[1], token_loc[2], error_msg), file=sys.stderr)
 
 
-def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
+def compile_to_elf64_asm(program, function_defs, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
     with open(output_file, "w") as asm: 
         ro_data = []
+        implicit_exit_req = True
         asm.write("BITS 64\n")
-        asm.write("segment .text\n")
+        asm.write("section .text\n")
         asm.write("print:\n")
-        asm.write("    mov     r9, 0xcccccccccccccccd\n")
         asm.write("    sub     rsp, 0x28\n")
+        asm.write("    mov     r9, 0xcccccccccccccccd\n")
         asm.write("    mov     BYTE [rsp+0x1f], 0xa\n")
         asm.write("    lea     rcx, [rsp+0x1e]\n")
         asm.write(".L00:\n")
@@ -329,8 +349,9 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    pop     rax\n")
                 asm.write("    push    rax\n")
                 asm.write("    cmp     rax, 0\n")
-                asm.write("    je      .L%d\n" % (op[0] + 1))
+                asm.write("    je      .L%da\n" % (op[0]))
                 asm.write("    push    rax\n")
+                asm.write(".L%da:\n" % (op[0]))
             elif builtin_type == Builtin.OP_MAX:
                 asm.write("    pop     rax\n")
                 asm.write("    pop     rbx\n")
@@ -459,6 +480,11 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_ENDIF:
                 pass        
+            elif builtin_type == Builtin.OP_SYSCALL_0:
+                # These are Linux syscalls that utilise no agruments
+                asm.write("    pop     rax\n")
+                asm.write("    syscall\n")
+                asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_SYSCALL_1:
                 # These are Linux syscalls that utilise arg0 (%rdi)
                 asm.write("    pop     rax\n")
@@ -516,26 +542,83 @@ def compile_to_elf64_asm(program, required_labels, output_file):  # [ ... ,((fil
                 str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 0
                 asm.write("    push    %d\n" % (str_len))
                 asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
-
+            elif builtin_type == Builtin.OP_FUNC_CALL: 
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if args_count > 0:
+                    asm.write("    pop     rdi\n")
+                if args_count > 1:
+                    asm.write("    pop     rsi\n")
+                if args_count > 2:
+                    asm.write("    pop     rdx\n")
+                if args_count > 3:
+                    asm.write("    pop     rcx\n")
+                if args_count > 4:
+                    asm.write("    pop     r8\n")
+                if args_count > 5:
+                    asm.write("    pop     r9\n")
+                if args_count > 6:
+                    assert False, "Too many arguments to function"
+                asm.write("    call    %s\n" % (function_name))
+                if returns_count > 0:
+                    asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_FUNC_RET:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if returns_count > 0:
+                    asm.write("    pop     rax\n")
+                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    ret\n")
+            elif builtin_type == Builtin.OP_FUNC_DEF:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
+                if implicit_exit_req:
+                    implicit_exit_req = False
+                    asm.write(".L%d:\n" % len(program))         # implicit exit       #TODO len(program) is not correct
+                    asm.write("    mov     eax, 0xe7\n")
+                    asm.write("    mov     rdi, 0x0\n")
+                    asm.write("    syscall\n")
+                asm.write("%s:\n" % function_name)
+                asm.write("    sub     rsp, 0x28\n")
+                if args_count > 6:
+                    assert False, "Too many arguments to function"
+                if args_count > 5:
+                    asm.write("    push    r9\n")
+                if args_count > 4:
+                    asm.write("    push    r8\n")
+                if args_count > 3:
+                    asm.write("    push    rcx\n")
+                if args_count > 2:
+                    asm.write("    push    rdx\n")
+                if args_count > 1:
+                    asm.write("    push    rsi\n")
+                if args_count > 0:
+                    asm.write("    push    rdi\n")
             else:
                 assert False, "Unreachable"
-
-        asm.write(".L%d:\n" % len(program))         # implicit exit       
-        asm.write("    mov     eax, 0xe7\n")
-        asm.write("    mov     rdi, 0x0\n")
-        asm.write("    syscall\n")
-
+        if implicit_exit_req:
+            implicit_exit_req = False
+            asm.write(".L%d:\n" % len(program))         # implicit exit       
+            asm.write("    mov     eax, 0xe7\n")
+            asm.write("    mov     rdi, 0x0\n")
+            asm.write("    syscall\n")
         if ro_data != []:
             asm.write("section .rodata\n")              # .ro_data section
             for string in list(enumerate(ro_data)):
                 str_label = "str%d" % (string[0])
                 str_data = string[1] + ",0x0" if string[1] else "0x0"
                 asm.write("    " + str_label + ": db " + str_data + "\n")
-        asm.write("segment .bss\n")                 # .bss section
+        asm.write("section .bss\n")                 # .bss section
         asm.write("    mem: resb %s\n" % MEMORY_SIZE)
 
 
-def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
+def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
     block_stack = []
     required_labels = []
     for op_label in range(len(program)):
@@ -549,20 +632,20 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
             try:
                 do_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
             try:
                 while_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -576,10 +659,10 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
             try:
                 if_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
@@ -590,35 +673,33 @@ def locate_blocks(program):  # [ ... ,((file, line, col), (token_type, builtin_t
             try:
                 if_or_else_loc = block_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % op_readable[builtin_type.name])
+                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
                 exit(1)
             try:
-                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % op_readable[builtin_type.name]
+                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
             except AssertionError as error_msg:
                 print_compilation_error(program[op_label], error_msg)
                 exit(1)
 
             program[if_or_else_loc] = (program[if_or_else_loc][0], (program[if_or_else_loc][1][0], program[if_or_else_loc][1][1], (op_label + 1))) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
-        elif (builtin_type == Builtin.OP_DUPNZ):
-            required_labels.append(op_label + 1)
     try:
             assert block_stack == []
     except AssertionError as error_msg:
         unmatched_token = program[block_stack.pop()]
         builtin_type = unmatched_token[1][1]
-        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % op_readable[unmatched_token[1][1].name])
+        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % Token.readable(unmatched_token[1][1].name))
         exit(1)
 
     if Debug == 3:
         print("DEBUG: locate_blocks:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
+    return program, function_defs, required_labels   # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
 
 
-def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, token_data), ... ]
-    program = []
+def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col), (token_type, token_data), ... ]
+    program = []                          # function_defs = { ... , function_name: ([function_name], [args], [returns], [function_tokens]), ... }
     for token in tokens:
         token_loc = token[0] 
         token_type = token[1][0]
@@ -721,6 +802,8 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_ELSE)))
         elif token_data == "endif":
             program.append((token_loc, (token_type, Builtin.OP_ENDIF)))
+        elif token_data == "syscall0":
+            program.append((token_loc, (token_type, Builtin.OP_SYSCALL_0)))
         elif token_data == "syscall1":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL_1)))
         elif token_data == "syscall2":
@@ -738,6 +821,13 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
         elif token_data[0] + token_data[-1] == "\'\'":
             program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
+        elif token_type == "label":
+            if token_data[1] == "f_def": 
+                program.append((token_loc, (token_type, Builtin.OP_FUNC_DEF, token_data[0])))
+            elif token_data[1] == "f_ret": 
+                program.append((token_loc, (token_type, Builtin.OP_FUNC_RET, token_data[0]))) 
+        elif token_data in function_defs:
+            program.append((token_loc, (token_type, Builtin.OP_FUNC_CALL, token_data)))
         else:
             try:
                 program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, int(token_data))))
@@ -749,7 +839,7 @@ def parse_tokens(tokens):  # tokens = [ ... , ((file, line, col), (token_type, t
         print("DEBUG: parse_tokens:", file=sys.stderr)
         pprint.pprint(program, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
-    return program     # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
+    return program, function_defs     # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
 
 
 def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, line, col), (token_type, token_data)), ... ]
@@ -788,18 +878,16 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
             # TODO: implement -I for additonal search paths
-            search_path = "."
-            # This is a local include
             if (next_token_data[0] + next_token_data[-1]) == "\"\"":
+                # This is a local include
+                search_path = "."
                 if (not (parent_file.find("/") == -1)):
                     search_path = parent_file[:parent_file.rfind("/")]
                 include_file_path = search_path + "/" + include_file
-            # This is a system include
             elif (next_token_data[0] + next_token_data[-1]) == "<>":
-                include_type = "system"
-                # TODO: setup filepath for include_file based on system include_type 
-                include_file_path = next_token_data[1:-1]
-                assert False, "ERROR `#include` system includes not implemented"
+                # This is a system include
+                # TODO: search_path currently is /lib in north.py execution location
+                include_file_path = "./lib/" + include_file + ".north"
             else:
                 print_compilation_error(tokens[1], "ERROR invalid include `%s`" % next_token_data)
                 exit(1)
@@ -828,14 +916,133 @@ def preprocessor_include(tokens, include_depth):  # tokens = [ ... , ((file, lin
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
 
 
+def preprocessor_function(tokens):
+    function_defs = {}
+    function_tokens = []
+    tokens_expanded = []
+    while len(tokens) > 0:
+        token_type = tokens[0][1][0]
+        token_data = tokens[0][1][1]
+        if (token_data == "def"):   #TODO: github copilot wrote garbage here
+            try:
+                assert (len(tokens) >= 2), "ERROR invalid function definition, expected function name"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            next_token = tokens[1]
+            try:
+                assert (next_token[1][0] == "keyword"), "ERROR invalid function name type `%s`, expected `keyword`" % (tokens[0][1][0])
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[1], error_msg)
+                exit(1)
+            try: 
+                assert (not (next_token[1][1] in function_defs)), "ERROR duplicate function name `%s`" % next_token[1][1]
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[1], error_msg)
+                exit(1)
+            try: 
+                assert (len(tokens) >= 3) , "ERROR invalid function definition"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            try: 
+                assert (tokens[2][1][1] == "(") , "ERROR invalid function argument definiton, expected `(`"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[2], error_msg)
+                exit(1)
+            try: 
+                assert (len(tokens) > 7) , "ERROR invalid function definition"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+            function_args = []
+            function_returns = []
+            tokens = tokens[1:]    # remove def
+            function_name = tokens[0][1][1]
+            function_name_loc = tokens[0][0]
+            # Valid characters in labels are letters, numbers, _, $, #, @, ~, ., and ?
+            # The only characters which may be used as the first character of an identifier are letters, _ and ?
+            valid_function_name = []
+            for c in function_name:
+                if c.isalpha() or c.isdecimal() or c in ["_", "$", "#", "@", "~", ".", "?"]:
+                    valid_function_name.append(c)
+                else:
+                    valid_function_name.append("".join("{:02x}".format(ord(c))))
+            valid_function_name = "f" + "".join(valid_function_name)
+            tokens = tokens[1:]    # remove func_name
+            tokens = tokens[1:]    # remove (
+            while (tokens[0][1][1] != "}"):
+                while (tokens[0][1][1] != "--"):
+                    function_args.append(tokens[0][1][1])
+                    try:
+                        assert tokens[0][1][1] != ")", "ERROR invalid function argument definiton, expected `--` before `)`"
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    try:
+                        assert tokens[0][1][0] == "keyword", "ERROR invalid function argument type `%s`, expected `keyword`" % (tokens[0][1][0])
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    tokens = tokens[1:]    # remove arg
+                tokens = tokens[1:]    # remove -- 
+                while (tokens[0][1][1] != ")"):
+                    function_returns.append(tokens[0][1][1])
+                    try:
+                        assert tokens[0][1][1] != "{", "ERROR invalid function argument definiton, expected `)` before `{`"
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    try:
+                        assert tokens[0][1][0] == "keyword", "ERROR invalid function return type `%s`, expected `keyword`" % (tokens[0][1][0])
+                    except AssertionError as error_msg:
+                        print_compilation_error(tokens[0], error_msg)
+                        exit(1)
+                    tokens = tokens[1:]    # remove return
+                tokens = tokens[1:]    # remove )
+                try:
+                    assert tokens[0][1][1] == "{", "ERROR invalid function definition, expected `{`"
+                except AssertionError as error_msg:
+                    print_compilation_error(tokens[0], error_msg)
+                    exit(1)
+                function_body_loc = tokens[0][0]
+                tokens = tokens[1:]    # remove {
+                function_tokens.append((function_name_loc, ("label", (function_name, "f_def"))))
+                try:
+                    assert tokens[0][1][1] != "{", "ERROR invalid function definition, `{` unexpected"
+                except AssertionError as error_msg:
+                    print_compilation_error(tokens[0], error_msg)
+                    exit(1)
+                while tokens[0][1][1] != "}":
+                    if (len(tokens) == 1) and (tokens[0][1][1] != "}"):
+                        print_compilation_error((function_body_loc, None), "ERROR invalid function definition, unmatched `{`")
+                        exit(1)
+                    function_tokens.append(tokens[0])
+                    tokens = tokens[1:]    # remove function token
+                tokens = tokens[1:]    # remove }
+                function_tokens.append((function_name_loc, ("label", (function_name, "f_ret"))))
+                break
+            function_defs[function_name] = (valid_function_name, function_args, function_returns)
+
+        else:
+            tokens_expanded.append(tokens[0])
+            tokens = tokens[1:]
+    tokens_expanded = tokens_expanded + function_tokens
+
+
+    if Debug == 3:
+        print("DEBUG: preprocessor_function:", file=sys.stderr)
+        pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
+        print("\n", file=sys.stderr)
+    return tokens_expanded, function_defs  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
+                                           # function_defs = { ... , function_name: ([function_name] [args], [returns], [function_tokens]), ... }
+
 def preprocessor_define(tokens):
     tokens_expanded = []
-    token_index = 0
     defines = {}
     while len(tokens) > 0:
         token_type = tokens[0][1][0]
         token_data = tokens[0][1][1]
-        parent_file = tokens[0][0][0]
         if (token_data == "#define"):
             try:     # Check for missing define_name 
                 assert (len(tokens) >= 2) , "ERROR `#define` missing define name"
@@ -871,7 +1078,7 @@ def preprocessor_define(tokens):
         pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]
-            
+
 
 def parse_line(file_path, line_num, line):
     token = ""
@@ -939,9 +1146,28 @@ def parse_line(file_path, line_num, line):
                 token += line[0]
                 line = line[1:]
                 cur_column += 1
+        elif line[0] in ["(", ")", "{", "}"]:   # parenthesis, braces
+            if token != "":    # no whitespace between tokens, yield token first
+                if token.isdecimal():
+                    token_type = "uint"
+                elif Token.is_member(token):  
+                    token_type = "builtin"
+                else:
+                    token_type = "keyword"
+                yield ((file_path, line_num, col_num), (token_type, token))
+                token = ""
+            token_type = "builtin"    
+            token += line[0]
+            line = line[1:]
+            col_num = cur_column
+            yield ((file_path, line_num, col_num), (token_type, token))
+            cur_column += 1
+            token = ""
         elif line[0].isspace():                 # whitespace marks end of token
             if token.isdecimal():
                 token_type = "uint"
+            elif Token.is_member(token):  
+                token_type = "builtin"
             else:
                 token_type = "keyword"
             line = line[1:]
@@ -963,6 +1189,8 @@ def parse_line(file_path, line_num, line):
     if token != "":
         if token.isdecimal():
             token_type = "uint"
+        elif Token.is_member(token):  
+            token_type = "builtin"
         else:
             token_type = "keyword"
         yield ((file_path, line_num, col_num), (token_type, token))
@@ -1036,12 +1264,14 @@ if __name__ == "__main__":
     if Debug in [1, 2]:
         cleanup_command.remove(asm_file)
 
+
     tokens = load_tokens(input_file)                                            # load tokens from input_file
-    # tokens_included = preprocessor_include(tokens, include_depth=[])            # recursively process includes
-    tokens_included = preprocessor_include(tokens, include_depth=[])                    # recursively process includes
-    tokens_processed = preprocessor_define(tokens_included)                     # process defines
-    program, required_labels = locate_blocks(parse_tokens(tokens_processed))     # parse tokens to program
-    compile_to_elf64_asm(program, required_labels, asm_file)                    # compile to asm
+    tokens_post_include = preprocessor_include(tokens, include_depth=[])        # recursively process includes
+    tokens_post_define = preprocessor_define(tokens_post_include)               # process defines
+    tokens_post_function, function_defs = preprocessor_function(tokens_post_define) # process functions
+    tokens_post_parse, function_defs = parse_tokens(tokens_post_function, function_defs) # parse tokens
+    program, function_defs, required_labels = locate_blocks(tokens_post_parse, function_defs) # cross-reference keywords
+    compile_to_elf64_asm(program, function_defs, required_labels, asm_file)     # compile to asm
     run_cmd(nasm_command)                                                       # assemble to elf
     run_cmd(ld_command)                                                         # link to executable
     
