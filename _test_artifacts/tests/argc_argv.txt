@@ -1,0 +1,14 @@
+:i argc 1
+:b arg0 20
+salt soymilk padlock
+:b stdin 0
+
+:i returncode 0
+:b stdout 30
+./output
+salt
+soymilk
+padlock
+
+:b stderr 0
+
