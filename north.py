@@ -12,6 +12,12 @@ Debug = 0
 MEMORY_SIZE = "0x1f400"
 MAX_INCLUDE_DEPTH = 58
 
+# TODO: implement break and continue
+# TODO: implement goto
+# TODO: implement early function return
+# TODO: ensure #defines are #defined
+# TODO: catch tokens that shouldn't make it past preprocessor
+
 
 class Builtin(Enum):
     OP_PUSH_INT = auto()    # push int onto stack
@@ -594,7 +600,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 returns_count = len(function[2])
                 if implicit_exit_req:
                     implicit_exit_req = False
-                    asm.write(".L%d:\n" % len(program))         # implicit exit       #TODO len(program) is not correct
+                    asm.write(".L%d:\n" % len(program))         # implicit exit
                     asm.write("    mov     eax, 0xe7\n")
                     asm.write("    mov     rdi, 0x0\n")
                     asm.write("    syscall\n")
@@ -942,7 +948,7 @@ def preprocessor_function(tokens):
     while len(tokens) > 0:
         token_type = tokens[0][1][0]
         token_data = tokens[0][1][1]
-        if (token_data == "def"):   #TODO: github copilot wrote garbage here
+        if (token_data == "def"):
             try:
                 assert (len(tokens) >= 2), "ERROR invalid function definition, expected function name"
             except AssertionError as error_msg:
@@ -1080,6 +1086,8 @@ def preprocessor_define(tokens):
                 print_compilation_error(tokens[0], error_msg)
                 exit(1)
             define_token = tokens[2][1]
+            if (define_token[1] in defines):
+                define_token = (defines[define_token[1]])
             if (not (define_name in defines)):
                 defines[define_name] = define_token
             else:
@@ -1089,7 +1097,6 @@ def preprocessor_define(tokens):
         else:
             if token_data in defines:
                 tokens[0] = ((tokens[0][0], (defines[tokens[0][1][1]])))
-
             tokens_expanded.append(tokens[0])
             tokens = tokens[1:]
     if Debug == 3:
