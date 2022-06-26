@@ -1,20 +1,113 @@
-#include <stdlib>
-
-#define write 1
+#define write 1 syscall3
 #define stdout 1
-                                    
+
+def squared ( a -- a_squared ) {
+    dup *
+}
+
+def sum_of_squares ( a b -- c ) {
+    squared
+    swap
+    squared
+    + 
+}
+
+def 3drop ( a b c -- ) {
+    drop drop drop
+}
+
+def strcmp ( s1 s2 -- int ) {
+    0 rot rot                                  ;> Flag=False &stra_ptr &strb_ptr
+    while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do  ; while (flag is not True) and (str_a[i] != '\0') and (str_b[i] != '\0')
+        2dup load8 swap load8 swap != if
+            rot drop 1 rot rot
+        endif
+        1 + swap 1 + swap
+    done 
+    load8 swap load8 swap != or 0 == if
+        1   ; return true
+    else
+        0   ; return false
+    endif  
+}                       
+
+; the nth lucas number
+def lucas_n ( int -- int ) {
+    dup 2 > if
+        dup 1 - lucas_n
+        swap
+        2 - lucas_n
+        + 
+    else
+        dup 1 == if
+            drop 2
+        else
+            drop 1
+        endif
+    endif
+}
+
+; the ackermann function
+;a(m,n) n=0 	1	    2	        3	            4	            5
+;m=0 	1	    2	    3	        4	            5               6
+;1	    2	    3	    4	        5	            6               7
+;2	    3	    5	    7	        9	            11	            13
+;3	    5	    13	    29	        61	            125	            253
+;4	    13	    65533	2^65533	    2^2^65533	    2^2^2^65533	    2^2^2^2^65533
+def ackermann( m n -- int ) {
+    2dup and if
+        2dup 1 - ackermann swap drop swap 1 - swap ackermann
+    else
+        over not if
+            swap drop 1 +
+        else
+            drop 1 - 1 ackermann
+        endif
+    endif
+}
+
+def early_return ( int -- int) {
+    dup 0 == if
+        return
+    endif
+    1001 +
+}
+
 
 20 squared print
+
 2 3 sum_of_squares print
+
 8 1 2 3 3drop print
 
 "here" swap drop ;> str_len &here_ptr
 "there" swap drop ;> str_len &here_ptr ;> str_len &there_ptr
-
 strcmp if 
-    "strings match\n" stdout write syscall3 drop
+    "strings match\n" stdout write drop
 else
-    "strings do not match\n" stdout write syscall3 drop
+    "strings do not match\n" stdout write drop
 endif
 
+1 
+while dup 10 < do
+    dup lucas_n
+    print
+    1 +
+done
 
+"ackermann:\n" stdout write drop
+
+0                   ; m 
+while dup 3 <= do 
+    0                 ; m n
+    while dup 5 <= do 
+        2dup ackermann print
+        1 +
+    done drop ; drop n
+    1 +
+done drop   ; drop m
+
+5
+1 early_return print
+0 early_return print
+print

@@ -14,9 +14,8 @@ MAX_INCLUDE_DEPTH = 58
 
 # TODO: implement break and continue
 # TODO: implement goto
-# TODO: implement early function return
-# TODO: ensure #defines are #defined
 # TODO: catch tokens that shouldn't make it past preprocessor
+# TODO: rename keyword to identifier
 
 
 class Builtin(Enum):
@@ -83,6 +82,7 @@ class Builtin(Enum):
     OP_FUNC_RET = auto()
     OP_ARGC = auto()
     OP_ARGV = auto()
+    OP_RETURN = auto()
 
 
 class Token(Enum):
@@ -150,6 +150,7 @@ class Token(Enum):
     OP_DEFINE = "#define"
     OP_ARGC = "argc"
     OP_ARGV = "argv"
+    OP_RETURN = "return"
     @classmethod
     def is_member(enum, value):
         try:
@@ -561,6 +562,11 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    mov     rax, [argc_ptr]\n")
                 asm.write("    add     rax, 0x8\n")
                 asm.write("    push    rax\n")
+            elif builtin_type == Builtin.OP_RETURN:
+                if returns_count > 0:
+                    asm.write("    pop     rax\n")
+                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    ret\n")
 
             elif builtin_type == Builtin.OP_FUNC_CALL: 
                 function = function_defs[op[1][1][2]]
@@ -846,6 +852,8 @@ def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col),
             program.append((token_loc, (token_type, Builtin.OP_ARGC)))
         elif token_data == "argv":
             program.append((token_loc, (token_type, Builtin.OP_ARGV)))
+        elif token_data == "return":
+            program.append((token_loc, (token_type, Builtin.OP_RETURN)))            
         elif token_type == "label":
             if token_data[1] == "f_def": 
                 program.append((token_loc, (token_type, Builtin.OP_FUNC_DEF, token_data[0])))
@@ -1092,10 +1100,10 @@ def preprocessor_define(tokens):
             while (tokens[0][0][1] == define_line_num):
                 define_tokens.append(tokens[0])
                 tokens = tokens[1:]
-            if (not (define_name in defines)):
+            if (not (define_name in defines)): 
                 redfined_tokens = []
                 for token in define_tokens:
-                    if (token[1][1] in defines):
+                    if (token[1][1] in defines):        # token is a previously seen #define in a #define
                         for tk in defines[token[1][1]]:
                             redfined_tokens.append(tk)
                     else:
