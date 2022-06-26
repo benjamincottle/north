@@ -15,7 +15,6 @@ MAX_INCLUDE_DEPTH = 58
 # TODO: implement break and continue
 # TODO: implement goto
 # TODO: catch tokens that shouldn't make it past preprocessor
-# TODO: rename keyword to identifier
 
 
 class Builtin(Enum):
@@ -142,9 +141,9 @@ class Token(Enum):
     OP_SYSCALL_1 = "syscall1"
     OP_SYSCALL_2 = "syscall2"
     OP_SYSCALL_3 = "syscall3"
-    OP_SYSCALL_4 = "syscall1"
-    OP_SYSCALL_5 = "syscall2"
-    OP_SYSCALL_6 = "syscall3"
+    OP_SYSCALL_4 = "syscall4"
+    OP_SYSCALL_5 = "syscall5"
+    OP_SYSCALL_6 = "syscall6"
     OP_DEF = "def"
     OP_INCLUDE = "#include"
     OP_DEFINE = "#define"
@@ -563,6 +562,10 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    add     rax, 0x8\n")
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_RETURN:
+                function = function_defs[op[1][1][2]]
+                function_name = function[0]
+                args_count = len(function[1])
+                returns_count = len(function[2])
                 if returns_count > 0:
                     asm.write("    pop     rax\n")
                 asm.write("    add     rsp, 0x28\n") 
@@ -853,7 +856,7 @@ def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col),
         elif token_data == "argv":
             program.append((token_loc, (token_type, Builtin.OP_ARGV)))
         elif token_data == "return":
-            program.append((token_loc, (token_type, Builtin.OP_RETURN)))            
+            program.append((token_loc, (token_type, Builtin.OP_RETURN, token[1][2])))            
         elif token_type == "label":
             if token_data[1] == "f_def": 
                 program.append((token_loc, (token_type, Builtin.OP_FUNC_DEF, token_data[0])))
@@ -964,7 +967,7 @@ def preprocessor_function(tokens):
                 exit(1)
             next_token = tokens[1]
             try:
-                assert (next_token[1][0] == "keyword"), "ERROR invalid function name type `%s`, expected `keyword`" % (tokens[0][1][0])
+                assert (next_token[1][0] == "identifier"), "ERROR invalid function name type `%s`, expected `identifier`" % (tokens[0][1][0])
             except AssertionError as error_msg:
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
@@ -1013,7 +1016,7 @@ def preprocessor_function(tokens):
                         print_compilation_error(tokens[0], error_msg)
                         exit(1)
                     try:
-                        assert tokens[0][1][0] == "keyword", "ERROR invalid function argument type `%s`, expected `keyword`" % (tokens[0][1][0])
+                        assert tokens[0][1][0] == "identifier", "ERROR invalid function argument type `%s`, expected `identifier`" % (tokens[0][1][0])
                     except AssertionError as error_msg:
                         print_compilation_error(tokens[0], error_msg)
                         exit(1)
@@ -1027,7 +1030,7 @@ def preprocessor_function(tokens):
                         print_compilation_error(tokens[0], error_msg)
                         exit(1)
                     try:
-                        assert tokens[0][1][0] == "keyword", "ERROR invalid function return type `%s`, expected `keyword`" % (tokens[0][1][0])
+                        assert tokens[0][1][0] == "identifier", "ERROR invalid function return type `%s`, expected `identifier`" % (tokens[0][1][0])
                     except AssertionError as error_msg:
                         print_compilation_error(tokens[0], error_msg)
                         exit(1)
@@ -1050,6 +1053,10 @@ def preprocessor_function(tokens):
                     if (len(tokens) == 1) and (tokens[0][1][1] != "}"):
                         print_compilation_error((function_body_loc, None), "ERROR invalid function definition, unmatched `{`")
                         exit(1)
+                    
+                    if tokens[0][1][1] == "return":
+                        tokens[0] = (tokens[0][0], (tokens[0][1][0], tokens[0][1][1], function_name))
+
                     function_tokens.append(tokens[0])
                     tokens = tokens[1:]    # remove function token
                 tokens = tokens[1:]    # remove }
@@ -1058,6 +1065,12 @@ def preprocessor_function(tokens):
             function_defs[function_name] = (valid_function_name, function_args, function_returns)
 
         else:
+            try:
+                assert tokens[0][1][1] != "return", "ERROR `return` not valid outside function body"
+            except AssertionError as error_msg:
+                print_compilation_error(tokens[0], error_msg)
+                exit(1)
+
             tokens_expanded.append(tokens[0])
             tokens = tokens[1:]
     tokens_expanded = tokens_expanded + function_tokens
@@ -1083,7 +1096,7 @@ def preprocessor_define(tokens):
                 print_compilation_error(tokens[0], error_msg)
                 exit(1)
             try:     # Check for valid define_name format
-                assert (tokens[1][1][0] == "keyword"), "ERROR invalid `#define` name"
+                assert (tokens[1][1][0] == "identifier"), "ERROR invalid `#define` name"
             except AssertionError as error_msg:
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
@@ -1202,7 +1215,7 @@ def parse_line(file_path, line_num, line):
                 elif Token.is_member(token):  
                     token_type = "builtin"
                 else:
-                    token_type = "keyword"
+                    token_type = "identifier"
                 yield ((file_path, line_num, col_num), (token_type, token))
                 token = ""
             token_type = "builtin"    
@@ -1218,7 +1231,7 @@ def parse_line(file_path, line_num, line):
             elif Token.is_member(token):  
                 token_type = "builtin"
             else:
-                token_type = "keyword"
+                token_type = "identifier"
             line = line[1:]
             cur_column += 1
             yield ((file_path, line_num, col_num), (token_type, token))
@@ -1241,7 +1254,7 @@ def parse_line(file_path, line_num, line):
         elif Token.is_member(token):  
             token_type = "builtin"
         else:
-            token_type = "keyword"
+            token_type = "identifier"
         yield ((file_path, line_num, col_num), (token_type, token))
     return
 
@@ -1319,7 +1332,7 @@ if __name__ == "__main__":
     tokens_post_define = preprocessor_define(tokens_post_include)               # process defines
     tokens_post_function, function_defs = preprocessor_function(tokens_post_define) # process functions
     tokens_post_parse, function_defs = parse_tokens(tokens_post_function, function_defs) # parse tokens
-    program, function_defs, required_labels = locate_blocks(tokens_post_parse, function_defs) # cross-reference keywords
+    program, function_defs, required_labels = locate_blocks(tokens_post_parse, function_defs) # cross-reference identifiers
     compile_to_elf64_asm(program, function_defs, required_labels, asm_file)     # compile to asm
     run_cmd(nasm_command)                                                       # assemble to elf
     run_cmd(ld_command)                                                         # link to executable

@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 95
+return
+^
+./tests/invalid_function_14.north:4:0: ERROR `return` not valid outside function body
+

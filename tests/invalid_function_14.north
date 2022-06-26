@@ -1,0 +1,7 @@
+def func ( int -- int ) { 
+ 1 +
+}
+
+return
+
+9 print
