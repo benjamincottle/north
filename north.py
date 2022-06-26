@@ -1079,28 +1079,43 @@ def preprocessor_define(tokens):
             except AssertionError as error_msg:
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
+            define_line_num = tokens[0][0][1]
             define_name = tokens[1][1][1]
-            try:     # Check for missing define_value
+            define_name_loc = tokens[1][0]
+            try:     # Check for missing define_value (min 3 tokens: #define name value)
                 assert (len(tokens) >= 3) , "ERROR `#define` missing define value"
             except AssertionError as error_msg:
                 print_compilation_error(tokens[0], error_msg)
                 exit(1)
-            define_token = tokens[2][1]
-            if (define_token[1] in defines):
-                define_token = (defines[define_token[1]])
+            tokens = tokens[2:]   # remove #define and define_name
+            define_tokens = []
+            while (tokens[0][0][1] == define_line_num):
+                define_tokens.append(tokens[0])
+                tokens = tokens[1:]
             if (not (define_name in defines)):
-                defines[define_name] = define_token
+                redfined_tokens = []
+                for token in define_tokens:
+                    if (token[1][1] in defines):
+                        for tk in defines[token[1][1]]:
+                            redfined_tokens.append(tk)
+                    else:
+                        redfined_tokens.append(token)
+                defines[define_name] = redfined_tokens
             else:
-                print_compilation_error(tokens[0], "ERROR `#define` redefinition of `%s`" % define_name)
+                print_compilation_error((define_name_loc, None), "ERROR `#define` redefinition of `%s`" % define_name)
                 exit(1)
-            tokens = tokens[3:]
         else:
             if token_data in defines:
-                tokens[0] = ((tokens[0][0], (defines[tokens[0][1][1]])))
-            tokens_expanded.append(tokens[0])
+                replace_loc = tokens[0][0]
+                for tk in defines[token_data]:
+                    tokens_expanded = tokens_expanded + [(replace_loc, tk[1])]
+            else:
+                tokens_expanded.append(tokens[0])
             tokens = tokens[1:]
+
     if Debug == 3:
-        print("DEBUG: preprocessor_define:", file=sys.stderr)
+        print("DEBUG: preprocessor_define:\n    #defines:", file=sys.stderr)
+        pprint.pprint(defines, stream=sys.stderr, indent=4, width=120)
         pprint.pprint(tokens_expanded, stream=sys.stderr, indent=4, width=120)
         print("\n", file=sys.stderr)
     return tokens_expanded  # tokens_expanded = [ ... , ((file, line, col), (token_type, token_data)), ... ]

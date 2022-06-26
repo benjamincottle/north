@@ -1,0 +1,5 @@
+#define A 10
+#define B A
+
+A print
+B print
