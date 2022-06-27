@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 77
+:b stderr 81
 endif
 ^
-./tests/invalid_unmatched_7.north:0:0: ERROR unmatched token `endif`
+./tests/invalid_unmatched_7.north:0:0: ERROR missing `if` before `endif`
 

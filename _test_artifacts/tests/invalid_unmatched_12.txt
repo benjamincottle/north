@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 115
+10 do while while dup 0 > do
+      ^
+./tests/invalid_unmatched_12.north:0:6: ERROR `while` missing `do` and `done`
+

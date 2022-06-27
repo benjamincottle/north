@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 87
+:b stderr 89
 if do done
-      ^
-./tests/invalid_unmatched_4.north:0:6: ERROR unmatched token `done`
+   ^
+./tests/invalid_unmatched_4.north:0:3: ERROR missing `while` before `do`
 

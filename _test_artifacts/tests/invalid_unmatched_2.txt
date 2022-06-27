@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 96
+:b stderr 100
 while dup done
           ^
-./tests/invalid_unmatched_2.north:0:10: ERROR unmatched token `done`
+./tests/invalid_unmatched_2.north:0:10: ERROR missing `do` before `done`
 

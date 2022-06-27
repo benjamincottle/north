@@ -1,0 +1,66 @@
+
+5 while dup 0 > do
+  dup print
+  1 -
+done drop
+
+; a nested while loop!
+5 while dup 0 > do
+  dup print
+  3 while dup 0 > do
+    dup print
+    1 -
+  done drop
+  1 -
+done drop
+
+10
+while dup 0 >= do
+    dup print
+    5
+    while dup 0 >= do
+        dup 2 == if
+            break
+        endif
+        dup print
+        1 -
+    done drop
+
+    dup 1 == if
+        break
+    endif
+
+    4
+    while dup 0 >= do
+        4 print
+        1 -
+    done drop
+
+
+    dup 5 == if
+        break
+    endif
+    1 -
+done
+
+10
+while dup 0 >= do
+    
+    dup 6 == if
+        1 -
+        continue
+    endif
+
+    dup 4 == if
+        1 -
+        continue
+    endif
+
+    5 while dup 0 >= do
+        dup print
+        1 -
+    done drop
+
+    dup print
+    1 -
+done drop

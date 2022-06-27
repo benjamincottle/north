@@ -1,0 +1,5 @@
+1 1 dup == if
+ 1 endif
+else
+ 2
+endif

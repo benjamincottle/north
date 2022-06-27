@@ -12,8 +12,6 @@ Debug = 0
 MEMORY_SIZE = "0x1f400"
 MAX_INCLUDE_DEPTH = 58
 
-# TODO: implement break and continue
-# TODO: implement goto
 # TODO: catch tokens that shouldn't make it past preprocessor
 
 
@@ -66,6 +64,8 @@ class Builtin(Enum):
     OP_WHILE = auto()
     OP_DO = auto()
     OP_DONE = auto()
+    OP_BREAK = auto()
+    OP_CONTINUE = auto()
     OP_IF = auto()
     OP_ELSE = auto()
     OP_ENDIF = auto()
@@ -134,6 +134,8 @@ class Token(Enum):
     OP_WHILE = "while"
     OP_DO = "do"
     OP_DONE = "done"
+    OP_BREAK = "break"
+    OP_CONTINUE = "continue"
     OP_IF = "if"
     OP_ELSE = "else"
     OP_ENDIF = "endif"
@@ -483,6 +485,10 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    je      .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_DONE:
                 asm.write("    jmp     .L%d\n" % (op[1][1][2]))
+            elif builtin_type == Builtin.OP_BREAK:
+                asm.write("    jmp     .L%d\n" % (op[1][1][2]))
+            elif builtin_type == Builtin.OP_CONTINUE:
+                asm.write("    jmp     .L%d\n" % (op[1][1][2]))
             elif builtin_type == Builtin.OP_IF:
                 asm.write("    pop     rax\n")
                 asm.write("    cmp     rax, 0x0\n")      
@@ -649,76 +655,106 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
 
 
 def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
-    block_stack = []
+    while_stack = []
+    if_stack = []
     required_labels = []
     for op_label in range(len(program)):
         token_loc = program[op_label][0]
         builtin_type = program[op_label][1][1]
         if (builtin_type == Builtin.OP_WHILE):
-            block_stack.append(op_label)
+            while_stack.append(op_label)
         elif (builtin_type == Builtin.OP_DO):
-            block_stack.append(op_label)
+            while_stack.append(op_label)
+        elif (builtin_type == Builtin.OP_BREAK):
+            while_stack.append(op_label)
+        elif (builtin_type == Builtin.OP_CONTINUE):
+            while_stack.append(op_label)
         elif (builtin_type == Builtin.OP_DONE):
+            continue_labels = []
+            break_labels = []
+            do_loc = 0
             try:
-                do_loc = block_stack.pop()
-            except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
-                exit(1)
-            try:
-                assert program[do_loc][1][1] == Builtin.OP_DO, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
+                assert (len(while_stack) >= 2)
             except AssertionError as error_msg:
-                print_compilation_error(program[op_label], error_msg)
+                if ((len(while_stack) == 1) and (program[while_stack[-1]][1][1] == Builtin.OP_DO)):
+                    message = "ERROR missing `while` before `do`"
+                    tk = program[while_stack[-1]]
+                elif ((len(while_stack) == 1) and (program[while_stack[-1]][1][1] == Builtin.OP_WHILE)):
+                    message = "ERROR missing `do` before `done`"
+                    tk = program[op_label]
+                elif len(while_stack) == 0:
+                    message = "ERROR missing `while` and `do` before `done`"
+                    tk = program[op_label]
+                print_compilation_error(tk, "%s" % message)
                 exit(1)
-            try:
-                while_loc = block_stack.pop()
-            except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
-                exit(1)
-            try:
-                assert program[while_loc][1][1] == Builtin.OP_WHILE, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
-            except AssertionError as error_msg:
-                print_compilation_error(program[op_label], error_msg)
-                exit(1)
+            while (program[while_stack[-1]][1][1] != Builtin.OP_WHILE):
+                if (program[while_stack[-1]][1][1] == Builtin.OP_CONTINUE):
+                    continue_labels.append(while_stack.pop())
+                elif (program[while_stack[-1]][1][1] == Builtin.OP_BREAK):
+                    break_labels.append(while_stack.pop())
+                elif (program[while_stack[-1]][1][1] == Builtin.OP_DO):
+                    try:
+                        assert program[while_stack[-2]][1][1] == Builtin.OP_WHILE, "ERROR missing `while` before `do`"
+                    except AssertionError as error_msg:
+                        print_compilation_error(program[while_stack[-1]], error_msg)
+                        exit(1)
+                    do_loc = while_stack.pop()
+            while_loc = while_stack.pop()
+            for continue_label in continue_labels:
+                program[continue_label] = (program[continue_label][0], (program[continue_label][1][0], program[continue_label][1][1], (while_loc + 1)))
+            for break_label in break_labels:
+                program[break_label] = (program[break_label][0], (program[break_label][1][0], program[break_label][1][1], (op_label + 1)))
             program[do_loc] = (program[do_loc][0], (program[do_loc][1][0], program[do_loc][1][1], (op_label + 1))) # do has the the (done + 1)  op's # as val
             required_labels.append(op_label + 1)
             program[op_label] = (token_loc, (program[op_label][1][0], builtin_type, (while_loc + 1))) # done has the while + 1 op's # as val
             required_labels.append(while_loc + 1)
         elif (builtin_type == Builtin.OP_IF):
-            block_stack.append(op_label)
+            if_stack.append(op_label)
         elif (builtin_type == Builtin.OP_ELSE):
             try:
-                if_loc = block_stack.pop()
+                if_loc = if_stack.pop()
             except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
-                exit(1)
-            try:
-                assert program[if_loc][1][1] == Builtin.OP_IF, "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
-            except AssertionError as error_msg:
-                print_compilation_error(program[op_label], error_msg)
+                print_compilation_error(program[op_label], "ERROR missing `if` before `else`")
                 exit(1)
             program[if_loc] = (program[if_loc][0], (program[if_loc][1][0], program[if_loc][1][1], (op_label + 1))) # if has (else + 1) op's # as val
             required_labels.append(op_label + 1)
-            block_stack.append(op_label)
+            if_stack.append(op_label)
         elif (builtin_type == Builtin.OP_ENDIF):
             try:
-                if_or_else_loc = block_stack.pop()
-            except IndexError as error_msg:
-                print_compilation_error(program[op_label], "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name))
-                exit(1)
-            try:
-                assert (program[if_or_else_loc][1][1] == Builtin.OP_IF) or (program[if_or_else_loc][1][1] == Builtin.OP_ELSE), "ERROR unmatched token `%s`" % Token.readable(program[op_label][1][1].name)
+                assert (len(if_stack) >= 1)
             except AssertionError as error_msg:
-                print_compilation_error(program[op_label], error_msg)
+                print_compilation_error(program[op_label], "ERROR missing `if` before `endif`")
                 exit(1)
-
+            if_or_else_loc = if_stack.pop()
             program[if_or_else_loc] = (program[if_or_else_loc][0], (program[if_or_else_loc][1][0], program[if_or_else_loc][1][1], (op_label + 1))) # if/else has (endif + 1) op's # as val
             required_labels.append(op_label + 1)
     try:
-            assert block_stack == []
+        assert ((while_stack == []))
     except AssertionError as error_msg:
-        unmatched_token = program[block_stack.pop()]
+        unmatched_token = program[while_stack.pop()]
         builtin_type = unmatched_token[1][1]
-        print_compilation_error(unmatched_token, "ERROR unmatched token `%s`" % Token.readable(unmatched_token[1][1].name))
+        if builtin_type == Builtin.OP_WHILE:
+            message = "ERROR `while` missing `do` and `done`"
+        elif builtin_type == Builtin.OP_CONTINUE:
+            message = "ERROR `continue` not valid outside `while` loop"
+        elif builtin_type == Builtin.OP_BREAK:
+            message = "ERROR `break` not valid outside `while` loop"
+        elif builtin_type == Builtin.OP_DO:
+            message = "ERROR `do` missing `while`"
+        else:
+            message = "ERROR unmatched token `%s`" % Token.readable(builtin_type.name)
+        print_compilation_error(unmatched_token, message)
+        exit(1)
+    try:
+        assert (if_stack == [])
+    except AssertionError as error_msg:
+        unmatched_token = program[if_stack.pop()]
+        builtin_type = unmatched_token[1][1]
+        if builtin_type == Builtin.OP_IF:
+            message = "ERROR missing `endif` after `if`"
+        else:
+            message = "ERROR unmatched token `%s`" % Token.readable(builtin_type.name)
+        print_compilation_error(unmatched_token, message)
         exit(1)
 
     if Debug == 3:
@@ -826,6 +862,10 @@ def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col),
             program.append((token_loc, (token_type, Builtin.OP_DO)))
         elif token_data == "done":
             program.append((token_loc, (token_type, Builtin.OP_DONE)))
+        elif token_data == "break":
+            program.append((token_loc, (token_type, Builtin.OP_BREAK)))            
+        elif token_data == "continue":
+            program.append((token_loc, (token_type, Builtin.OP_CONTINUE)))    
         elif token_data == "if":
             program.append((token_loc, (token_type, Builtin.OP_IF)))
         elif token_data == "else":

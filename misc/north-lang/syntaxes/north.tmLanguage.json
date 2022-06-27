@@ -22,7 +22,7 @@
 		"keywords": {
 			"patterns": [{
 				"name": "entity.name.function.north",
-				"match": "\\b(if|else|endif|while|do|done)\\b"
+				"match": "\\b(if|else|endif|while|do|break|continue|done)\\b"
 			},
 			{
 				"name": "entity.name.class.north",

@@ -14,7 +14,7 @@ set iskeyword=a-z,A-Z,-,*,_,!,@
 syntax keyword northTodos TODO FIXME NOTE
 
 " Language keywords
-syntax keyword northKeywords if else endif while do done exit syscall0 syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 print include define or not and
+syntax keyword northKeywords if else endif while do break continue done exit syscall0 syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 print include define or not and
 syntax keyword northKeywords dup drop over swap rot dupnz min max 
 syntax keyword northKeywords load store mem argc argv return
 

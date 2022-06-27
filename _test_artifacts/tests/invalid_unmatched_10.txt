@@ -1,0 +1,11 @@
+:i argc 0
+:b stdin 0
+
+:i returncode 1
+:b stdout 0
+
+:b stderr 100
+1 1 == do do
+          ^
+./tests/invalid_unmatched_10.north:0:10: ERROR missing `while` before `do`
+

@@ -1,14 +1,14 @@
 #include <stdlib>
 
-#define write 1
+#define write 1 syscall3 
 #define stdout 1
 
 argv 
 argc
 while dup 0 > do
   over load64 dup strlen swap 
-  stdout write syscall3 drop
-  "\n" stdout write syscall3 drop
+  stdout write drop
+  "\n" stdout write drop
   1 - swap 
   8 + swap
 done
