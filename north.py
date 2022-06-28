@@ -177,10 +177,14 @@ def print_compilation_error(token, error_msg):   # ((file, line, col), (token_ty
 
 def compile_to_elf64_asm(program, function_defs, required_labels, output_file):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ], [label_number, ...]
     with open(output_file, "w") as asm: 
-        ro_data = []
+        str_data = []
         implicit_exit_req = True
-        asm.write("BITS 64\n")
-        asm.write("section .text\n")
+        if assembler == "nasm":
+            asm.write("BITS 64\n")
+            asm.write("section .text\n")
+        elif assembler == "fasm":
+            asm.write("format ELF64\n")
+            asm.write("section '.text' executable\n")
         asm.write("print:\n")
         asm.write("    sub     rsp, 0x28\n")
         asm.write("    mov     r9, 0xcccccccccccccccd\n")
@@ -214,7 +218,10 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
         asm.write("    syscall\n")
         asm.write("    add     rsp, 0x28\n")
         asm.write("    ret\n")
-        asm.write("global _start\n")
+        if assembler == "nasm":
+            asm.write("global _start\n")
+        elif assembler == "fasm":
+            asm.write("public _start as '_start'\n")
         asm.write("_start:\n")
         asm.write("    mov     [argc_ptr], rsp\n")
         for op in list(enumerate(program)): # op = (index, ((file, line, col), (token_type, builtin_type, [token_data])))
@@ -554,11 +561,11 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 asm.write("    syscall\n")
                 asm.write("    push    rax\n")
             elif builtin_type == Builtin.OP_PUSH_STR:
-                if (not (op[1][1][2]) in ro_data):
-                    ro_data.append(op[1][1][2])
+                if (not (op[1][1][2]) in str_data):
+                    str_data.append(op[1][1][2])
                 str_len = len(op[1][1][2].split(",")) if (op[1][1][2]) else 0
                 asm.write("    push    %d\n" % (str_len))
-                asm.write("    push    %s\n" % ("str" + str(ro_data.index(op[1][1][2]))))
+                asm.write("    push    %s\n" % ("str" + str(str_data.index(op[1][1][2]))))
             elif builtin_type == Builtin.OP_ARGC:
                 asm.write("    mov     rax, [argc_ptr]\n")
                 asm.write("    mov     rax, [rax]\n")
@@ -576,7 +583,6 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                     asm.write("    pop     rax\n")
                 asm.write("    add     rsp, 0x28\n") 
                 asm.write("    ret\n")
-
             elif builtin_type == Builtin.OP_FUNC_CALL: 
                 function = function_defs[op[1][1][2]]
                 function_name = function[0]
@@ -643,15 +649,22 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
             asm.write("    mov     eax, 0xe7\n")
             asm.write("    mov     rdi, 0x0\n")
             asm.write("    syscall\n")
-        if ro_data != []:
-            asm.write("section .rodata\n")              # .ro_data section
-            for string in list(enumerate(ro_data)):
+        if assembler == "nasm":
+            asm.write("section .data\n") if not str_data else None
+        elif assembler == "fasm":
+            asm.write("section '.data' writable\n") 
+        if str_data != []:
+            for string in list(enumerate(str_data)):
                 str_label = "str%d" % (string[0])
                 str_data = string[1] + ",0x0" if string[1] else "0x0"
                 asm.write("    " + str_label + ": db " + str_data + "\n")
-        asm.write("section .bss\n")                 # .bss section
-        asm.write("    argc_ptr: resq 0x1\n")
-        asm.write("    mem: resb %s\n" % MEMORY_SIZE)
+        if assembler == "nasm":
+            asm.write("section .bss\n")                 # .bss section
+            asm.write("    argc_ptr: resq 0x1\n")
+            asm.write("    mem: resb %s\n" % MEMORY_SIZE)
+        elif assembler == "fasm":
+            asm.write("    argc_ptr: rq 0x1\n")
+            asm.write("    mem: rb %s\n" % MEMORY_SIZE)
 
 
 def locate_blocks(program, function_defs):  # [ ... ,((file, line, col), (token_type, builtin_type, [token_data])), ... ]
@@ -1328,13 +1341,20 @@ def load_tokens(file_path):
 def run_cmd(cmd):
     if Debug in [1, 2, 3]:
         print("    [ " + " ".join(cmd) + " ]", file=sys.stderr)
-    return subprocess.call(cmd)
+        return subprocess.call(cmd)
+    else:
+        if cmd[0] == "fasm":
+            return subprocess.call(cmd, stdout=subprocess.DEVNULL)
+        else:
+            return subprocess.call(cmd)
+    
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(add_help=False, description="north.py is a compiler for the north programming language. north is a concatenative, stack based language inspired by forth. Target for compilation is x86-64 Linux. Output is a statically linked ELF 64-bit LSB executable.")
     parser.add_argument("-h", action="help", default=argparse.SUPPRESS, help="Show this help message and exit.")
-    parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols.")
+    parser.add_argument("-a", choices=["fasm", "nasm"], required=False, type=str, default="fasm", help="Specify assembler to use. Default is fasm.")
+    parser.add_argument("-g", required=False, default=False, action="store_true", help="Generate an executable containing debug symbols (nasm only).")
     parser.add_argument("-D", choices=[1, 2, 3], required=False, type=int, default=0, help="Use compliation debug mode with increasing verbosity.")
     parser.add_argument("-o", dest="output_file", required=False, type=str, help="Provide an alternative filename for the generated executable.")
     parser.add_argument("-r", dest="exec_output", required=False, action="store_true", help="Additionally execute output on successful compilation.")
@@ -1343,6 +1363,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     if (args.exec_output == False) and (not(args.exec_args == "")):
         parser.error('The -rA argument requires the -r argument.')
+    if (args.a == "fasm") and (args.g == True):
+        parser.error('The -g argument is not supported by fasm.')
     input_file = args.input_file
     asm_file = Path(input_file).stem + ".asm"
     o_file = Path(input_file).stem + ".o"
@@ -1353,15 +1375,19 @@ if __name__ == "__main__":
         o_file = args.output_file + ".o"
         output_file = args.output_file
 
+    assembler = args.a
+
     Debug = args.D
     exec_output = args.exec_output 
 
-    nasm_command = ["nasm", "-g", "-felf64", asm_file]
+    if assembler == "nasm":
+        assembler_command = ["nasm", "-g", "-felf64", "-o", o_file, asm_file]
+        if (not args.g):
+            assembler_command.remove("-g")
+    elif assembler == "fasm":
+        assembler_command = ["fasm", asm_file, o_file]
     ld_command = ["ld", "-o", output_file, o_file]
     cleanup_command = ["rm", asm_file, o_file]
-
-    if (not args.g):
-        nasm_command.remove("-g")
 
     if Debug in [1, 2]:
         cleanup_command.remove(asm_file)
@@ -1374,11 +1400,11 @@ if __name__ == "__main__":
     tokens_post_parse, function_defs = parse_tokens(tokens_post_function, function_defs) # parse tokens
     program, function_defs, required_labels = locate_blocks(tokens_post_parse, function_defs) # cross-reference identifiers
     compile_to_elf64_asm(program, function_defs, required_labels, asm_file)     # compile to asm
-    run_cmd(nasm_command)                                                       # assemble to elf
+    run_cmd(assembler_command)                                                  # assemble to elf
     run_cmd(ld_command)                                                         # link to executable
-    
+
     if not Debug == 3:
-        run_cmd(cleanup_command)                                                # remove temporary files
+        run_cmd(cleanup_command)                                                # remove temporary files unless Debug
 
     if exec_output:
         exit(run_cmd(["./" + output_file] + args.exec_args.split()))            # execute output

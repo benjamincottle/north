@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 
-
 from cmath import e
 import sys
 import os
 from os import path
 import subprocess
 import shlex
+from tabnanny import verbose
 from typing import List, BinaryIO, Tuple, Optional
 from dataclasses import dataclass, field
 
@@ -115,26 +115,27 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     if tc is not None:
         if len(tc.argv) != 0:
-            com = cmd_run_echoed([sys.executable, "north.py", "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
+            com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
         else:
-            com = cmd_run_echoed([sys.executable, "north.py", "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
+            com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
         if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
-            print("[ERROR] Unexpected output")
-            print("  Expected:")
+            print("[ERROR] Unexpected output ------------------------------------------")
+            print("  >> Expected:")
             print("    return code: %s" % tc.returncode)
             print("    stdout: \n%s" % tc.stdout.decode("utf-8"))
             print("    stderr: \n%s" % tc.stderr.decode("utf-8"))
-            print("  Actual:")
+            print("  >> Actual:")
             print("    return code: %s" % com.returncode)
             print("    stdout: \n%s" % com.stdout.decode("utf-8"))
             print("    stderr: \n%s" % com.stderr.decode("utf-8"))
+            print("--------------------------------------------------------------------")
             error = True
             stats.failed += 1
         else:
             stats.passed += 1
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
-        com = cmd_run_echoed([sys.executable, "north.py", "-o", "output", file_path], capture_output=True)
+        com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-o", "output", file_path], capture_output=True)
         if com.returncode != 0:
             error = True
             stats.failed += 1
@@ -190,10 +191,9 @@ def update_output_for_file(file_path: str):
 
 
     if len(tc.argv) != 0:
-        output = cmd_run_echoed([sys.executable, "north.py", "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
+        output = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
     else:
-        output = cmd_run_echoed([sys.executable, "north.py", "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
-
+        output = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
     print("[INFO] Saving output to %s" % tc_path)
     save_test_case(tc_path,
                    tc.argv, tc.stdin,
@@ -207,8 +207,11 @@ def update_output_for_folder(folder: str):
 
 
 def usage(exe_name: str):
-    print("Usage: ./test.py [SUBCOMMAND]")
+    print("Usage: ./test.py [ASSEMBLER] [SUBCOMMAND]")
     print("  Run or update the tests. The default [SUBCOMMAND] is 'run'.")
+    print()
+    print("  ASSEMBLER:")
+    print("    Optionally specify the assembler to use. Valid options are fasm and nasm. Default is fasm.")  
     print()
     print("  SUBCOMMAND:")
     print("    run [TARGET]")
@@ -220,9 +223,9 @@ def usage(exe_name: str):
     print("      The default [SUBSUBCOMMAND] is 'output'")
     print()
     print("      SUBSUBCOMMAND:")
-    print("        input <TARGET>")
+    print("        input <TARGET> [ARGV]")
     print("          Update the input of the <TARGET>. The <TARGET> can only be")
-    print("          a *.north file.")
+    print("          a *.north file. [ARGV] is an optional list of arguments to pass to the program.")
     print()
     print("        output [TARGET]")
     print("          Update the output of the [TARGET]. The [TARGET] is either a *.north")
@@ -230,7 +233,7 @@ def usage(exe_name: str):
     print("          './tests/'")
     print()
     print("    full (synonyms: all)")
-    print("      Check everything. (Should be run on CI)")
+    print("      Check ./tests/ and ./examples/")
     print()
     print("    help")
     print("      Print this message to stdout and exit with 0 code.")
@@ -238,10 +241,17 @@ def usage(exe_name: str):
 if __name__ == '__main__':
     exe_name, *argv = sys.argv
     subcommand = "run"
+    assembler = "fasm"
 
     if len(argv) > 0:
         subcommand, *argv = argv
 
+    if subcommand == "fasm" or subcommand == "nasm":
+        assembler = subcommand
+        subcommand = "run"
+        if len(argv) > 0:
+            subcommand, *argv = argv
+    
     if subcommand == 'update' or subcommand == 'record':
         subsubcommand = 'output'
         if len(argv) > 0:
