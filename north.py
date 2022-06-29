@@ -650,7 +650,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
             asm.write("    mov     rdi, 0x0\n")
             asm.write("    syscall\n")
         if assembler == "nasm":
-            asm.write("section .data\n") if not str_data else None
+            asm.write("section .data\n") if str_data else None
         elif assembler == "fasm":
             asm.write("section '.data' writable\n") 
         if str_data != []:

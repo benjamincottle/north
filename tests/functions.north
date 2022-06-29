@@ -1,35 +1,12 @@
+#include <string>
+#include <maths>
 #define write 1 syscall3
 #define stdout 1
-
-def squared ( a -- a_squared ) {
-    dup *
-}
-
-def sum_of_squares ( a b -- c ) {
-    squared
-    swap
-    squared
-    + 
-}
 
 def 3drop ( a b c -- ) {
     drop drop drop
 }
 
-def strcmp ( s1 s2 -- int ) {
-    0 rot rot                                  ;> Flag=False &stra_ptr &strb_ptr
-    while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do  ; while (flag is not True) and (str_a[i] != '\0') and (str_b[i] != '\0')
-        2dup load8 swap load8 swap != if
-            rot drop 1 rot rot
-        endif
-        1 + swap 1 + swap
-    done 
-    load8 swap load8 swap != or 0 == if
-        1   ; return true
-    else
-        0   ; return false
-    endif  
-}                       
 
 ; the nth lucas number
 def lucas_n ( int -- int ) {
@@ -65,6 +42,7 @@ def ackermann( m n -- int ) {
         endif
     endif
 }
+
 
 def early_return ( int -- int) {
     dup 0 == if
@@ -111,3 +89,18 @@ done drop   ; drop m
 1 early_return print
 0 early_return print
 print
+
+; use revstr to reverse argv[0]
+argv
+argc
+while dup 0 > do
+  over load64 dup revstr strlen swap 
+  stdout write drop
+  "\n" stdout write drop
+  1 - swap 
+  8 + swap
+done
+
+"Hello World! " 1 1 syscall3 drop
+"Hello World!" swap drop revstr dup strlen swap 1 1 syscall3 drop
+"\n" 1 1 syscall3 drop

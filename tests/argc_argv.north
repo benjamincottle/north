@@ -1,4 +1,4 @@
-#include <stdlib>
+#include <string>
 
 #define write 1 syscall3 
 #define stdout 1
