@@ -1,0 +1,41 @@
+; maths.north
+
+def squared ( a -- a_squared ) {
+    dup *
+}
+
+def sum_of_squares ( a b -- c ) {
+    squared
+    swap
+    squared
+    + 
+}
+
+; pow function calculates base^exponent
+; returns 0 when the abs(base) is != 1 and the exponent is negative
+def pow ( base exponent -- result ) {
+    dup 0 < if
+        over 0 == if 
+            "base can not be 0 with a negative exponent\n" 1 1 syscall3 drop
+            1 exit
+        endif
+        over squared 1 != if
+            2drop 0
+        else
+            dup 1 & if
+                drop
+            else
+                2drop 1
+            endif
+        endif
+    endif
+    1   ; base exponent v
+    while over 0 > do
+        over 1 & if
+            rot dup rot *  ; exponent  base (base * v)
+            swap rot rot         
+        endif
+        rot squared rot 1 >> rot    
+    done
+    swap drop swap drop
+}

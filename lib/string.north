@@ -1,0 +1,94 @@
+; string.north
+
+#define NULL 0
+
+def strcmp ( s1 s2 -- int ) {
+    0 rot rot                                  ;> Flag=False &stra_ptr &strb_ptr
+    while rot dup 1 != 2swap dup load8 0 != rot dup load8 0 != rot and 2swap rot rot and do  ; while (flag is not True) and (str_a[i] != '\0') and (str_b[i] != '\0')
+        2dup load8 swap load8 swap != if
+            rot drop 1 rot rot
+        endif
+        1 + swap 1 + swap
+    done 
+    load8 swap load8 swap != or 0 == if
+        1   ; return true
+    else
+        0   ; return false
+    endif  
+}
+
+;The strcmp() function shall compare the string pointed to by s1 to the string pointed to by s2. 
+;The sign of a non-zero return value shall be determined by the sign of the difference between the values 
+;of the first pair of bytes (both interpreted as type unsigned char) that differ in the strings being compared. 
+;Upon completion, strcmp() shall return an integer greater than, equal to, or less than 0, if the string 
+;pointed to by s1 is greater than, equal to, or less than the string pointed to by s2, respectively.
+def cstrcmp (s1 s2 -- int ) {
+    while 2dup swap load8 dup 0 != swap rot load8 == and do
+        1 + swap 1 + swap
+    done
+    load8 swap load8 swap
+    2dup >= if
+        -
+    else
+        2drop 18446744073709551614
+    endif
+}
+
+;The strlen function shall compute the number of bytes in the string to which s points, not including the
+;terminating null byte. It returns the number of bytes in the string. 
+def strlen (s -- len) {
+    dup
+    while dup load8 0 != do
+        1 +
+    done
+    swap -
+}
+
+;The strchr function shall locate the first occurrence of c (converted to a char) in the string pointed to by s.
+;The terminating null byte is considered to be part of the string. 
+;The function returns the location of the found character, or a null pointer if the character was not found.
+def strchr (s c -- ptr) {
+    while 2dup swap load8 dup 0 != swap rot != and do
+        swap 1 +
+        swap
+    done
+    over load8 != if
+        drop NULL
+    endif
+}
+
+;The strrchr function shall locate the last occurrence of c (converted to a char) in the string pointed to by s.
+;The terminating null byte is considered to be part of the string. 
+;The function returns the location of the found character, or a null pointer if the character was not found.
+
+def strrchr (s c -- ptr) {
+    NULL rot rot
+    dup 0 == if
+        drop swap drop 0 strchr
+    else
+        while 2dup strchr dup NULL != do
+            dup swap 1 +
+            2swap swap drop
+            2swap swap drop
+            rot rot
+        done
+        2drop drop
+    endif
+}
+
+; revstr takes a string pointer as input and returns the same pointer with 
+; the characters reversed "Hello World!" -> "!dlroW olleH"
+def revstr ( str_ptr -- str_ptr ) {
+    dup strlen 1 -  ; j = strlen(str_ptr) - 1
+    0               ; i = 0
+    while 2dup > do ; while i < j
+        rot 2dup + load8  ; c = str_ptr[i]
+        swap 2swap rot rot 2dup + load8  ; str_ptr[j]
+        2swap 2dup + 2swap rot rot store8 ; str_ptr[i] = str_ptr[j]
+        swap 2swap rot 2dup + 2swap rot rot store8 ; str_ptr[j] = c
+        1 -  ; decrement j
+        rot  
+        1 +  ; increment i 
+    done drop drop  ; drop i, j, return str_ptr
+}
+
