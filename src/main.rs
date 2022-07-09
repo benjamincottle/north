@@ -224,9 +224,10 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
         input_line
     };
     eprintln!("{}", input_line);
-    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold());
+//    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold());
+    eprintln!("{}{}", " ".repeat(token_loc.2), "^");
     eprintln!(
-        "{}:{}:{} {}",
+        "{}:{}:{}: {}",
         token_loc.0.display(),
         token_loc.1,
         token_loc.2,
@@ -860,9 +861,9 @@ fn compile_to_elf64_asm(
         for (str_index, static_str) in str_data.iter().enumerate() {
             let str_label = format!("str{}", str_index);
             let mut hex_str = String::new();
-            for c in static_str.clone().chars() {
-                hex_str.extend(format!("{:#x},", c as u32).to_string().chars());
-            }
+            for byte in static_str.bytes() {
+                hex_str.push_str(&format!("0x{:02x},", byte));
+            };
             hex_str.pop();
             if hex_str.len() > 0 {
                 hex_str.extend(",0x0".chars());
@@ -932,16 +933,16 @@ fn locate_blocks(
                 while_stack.push((index, (program[index].clone())));
             }
             ProgramOp::DONE => {
-                if while_stack.len() <= 1 {
+                if while_stack.len() < 2 {
                     if while_stack.len() == 1
-                        && while_stack.last().unwrap().1 .1 .1 != ProgramOp::DO
+                        && while_stack.last().unwrap().1 .1 .1 == ProgramOp::DO
                     {
                         let error_message = "ERROR missing `while` before `do`";
                         let token_loc = program[while_stack.last().unwrap().0.clone()].0.clone();
                         print_compilation_message(token_loc, error_message);
                         std::process::exit(1);
                     } else if while_stack.len() == 1
-                        && while_stack.last().unwrap().1 .1 .1 != ProgramOp::WHILE
+                        && while_stack.last().unwrap().1 .1 .1 == ProgramOp::WHILE
                     {
                         let error_message = "ERROR missing `do` before `done`";
                         let token_loc = program[index].0.clone();
@@ -966,7 +967,8 @@ fn locate_blocks(
                             break_labels.push(while_stack.pop().unwrap().0);
                         }
                         ProgramOp::DO => {
-                            if while_stack[while_stack.len() - 1].1 .1 .1 == ProgramOp::WHILE {
+                            // eprintln!("while_stack {:?}", while_stack);
+                            if while_stack[while_stack.len() - 2].1 .1 .1 != ProgramOp::WHILE {
                                 print_compilation_message(
                                     program[while_stack.last().unwrap().0.clone()].0.clone(),
                                     "ERROR missing `while` before `do`",
@@ -1156,7 +1158,7 @@ fn parse_tokens(
             TokenType::String => {
                 program.push((
                     token.0.clone(),
-                    (token.1 .0, ProgramOp::PUSHSTR, Some(token_data.clone())),
+                    (token.1 .0, ProgramOp::PUSHSTR, Some(token_data.clone().trim_end_matches("\"").trim_start_matches("\"").to_string())),
                 ));
             }
             TokenType::Char => {
@@ -1320,7 +1322,7 @@ fn preprocessor_function(
                     print_compilation_message(
                         tokens[0].0.clone(),
                         (format!(
-                            "ERROR invalid function 8 argument definiton, expected `)` before `{{`"
+                            "ERROR invalid function argument definiton, expected `)` before `{{`"
                         ))
                         .as_str(),
                     );
@@ -1340,6 +1342,16 @@ fn preprocessor_function(
                 function_returns.push(tokens.remove(0).1 .1.clone());
             }
             tokens.remove(0); // Remove the )
+            if tokens[0].1 .1 != "{" {
+                print_compilation_message(
+                    tokens[0].0.clone(),
+                    (format!(
+                        "ERROR invalid function definition, expected `{{`"
+                    ))
+                    .as_str(),
+                );
+                std::process::exit(1);
+            };
             let function_body_loc = tokens[0].0.clone();
             tokens.remove(0); // Remove the {
             function_tokens.push((
@@ -1429,17 +1441,21 @@ fn preprocessor_define(
     let mut defines: HashMap<String, Define> = HashMap::new();
     while tokens.len() > 0 {
         let token = tokens.remove(0);
-        let token_type = token.1 .0.clone();
         let token_data = token.1 .1.clone();
         if token_data == "#define" {
-            if tokens.len() < 2 {
+            if tokens.len() < 1 {
                 print_compilation_message(token.0.clone(), "ERROR `#define` missing define name");
                 std::process::exit(1);
             };
-            if token_type != TokenType::Identifier {
-                print_compilation_message(tokens[1].0.clone(), "ERROR invalid `#define` name");
+            if tokens[0].1.0 != TokenType::Identifier {
+                print_compilation_message(tokens[0].0.clone(), "ERROR invalid `#define` name");
                 std::process::exit(1);
             };
+            if tokens.len() < 3 {
+                print_compilation_message(token.0.clone(), "ERROR `#define` missing define value");
+                std::process::exit(1);
+            };
+            let define_name_loc = tokens[0].0.clone();
             let define_name = tokens.remove(0).1 .1.clone();
             let mut define = Define {
                 file_path: token.0 .0.clone(),
@@ -1447,17 +1463,13 @@ fn preprocessor_define(
                 col_num: tokens[0].0 .2,
                 tokens: Vec::new(),
             };
-            if tokens.len() < 3 {
-                print_compilation_message(token.0.clone(), "ERROR `#define` missing define value");
-                std::process::exit(1);
-            };
             while tokens[0].0 .1 == define.line_num {
                 define.tokens.push(tokens.remove(0));
             }
             match defines.get(&define_name) {
-                Some(name) => {
+                Some(_name) => {
                     print_compilation_message(
-                        (name.file_path.clone(), name.line_num, name.col_num),
+                        define_name_loc,
                         format!("ERROR `#define` redefinition of `{}`", define_name).as_str(),
                     );
                     std::process::exit(1);
@@ -1516,7 +1528,7 @@ fn preprocessor_include(
         let token_data = token.1 .1.clone();
         let parent_file = token.0 .0.clone();
         if token_data == "#include" {
-            if tokens.len() < 2 {
+            if tokens.len() == 0 {
                 print_compilation_message(token.0.clone(), "ERROR `#include` missing include file");
                 std::process::exit(1);
             };
