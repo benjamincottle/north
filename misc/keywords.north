@@ -7,14 +7,14 @@ and &&
 or || 
 not !
 & | ~ ^ << >>
-while do done if else endif syscall0 syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 def
+while do break continue done if else endif syscall0 syscall1 syscall2 syscall3 syscall4 syscall5 syscall6 def return
 #include #define
 
 
 99 "String!\n"
 'a' 'b' 'c' 
 #include "comments.north"
-#include <std.north>
+#include <string>
 #define
 def ( -- ) { }
 invalid
