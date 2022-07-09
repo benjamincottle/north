@@ -581,7 +581,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 returns_count = len(function[2])
                 if returns_count > 0:
                     asm.write("    pop     rax\n")
-                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    pop     rbp\n") 
                 asm.write("    ret\n")
             elif builtin_type == Builtin.OP_FUNC_CALL: 
                 function = function_defs[op[1][1][2]]
@@ -612,7 +612,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                 returns_count = len(function[2])
                 if returns_count > 0:
                     asm.write("    pop     rax\n")
-                asm.write("    add     rsp, 0x28\n") 
+                asm.write("    pop     rbp\n") 
                 asm.write("    ret\n")
             elif builtin_type == Builtin.OP_FUNC_DEF:
                 function = function_defs[op[1][1][2]]
@@ -626,7 +626,8 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
                     asm.write("    mov     rdi, 0x0\n")
                     asm.write("    syscall\n")
                 asm.write("%s:\n" % function_name)
-                asm.write("    sub     rsp, 0x28\n")
+                asm.write("    push    rbp\n")
+                asm.write("    mov     rbp, rsp\n")
                 if args_count > 6:
                     assert False, "Too many arguments to function"
                 if args_count > 5:
