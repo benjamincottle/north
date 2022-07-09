@@ -237,8 +237,10 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
 fn run_cmd(mut cmd: Command, debug_level: usize) {
     match debug_level {
         0 => {
-            cmd.stdout(Stdio::null())
-                .status()
+            if cmd.get_program() == "fasm" {
+                cmd.stdout(Stdio::null());
+            };
+            cmd.status()
                 .expect("command failed to start");
         }
         _ => {
@@ -1989,12 +1991,12 @@ fn main() {
     run_cmd(ld_command, debug_level);
     let mut cleanup_command = Command::new("rm");
     cleanup_command.arg(o_file);
-    if debug_level < 3 {
+    if debug_level < 1 {
         cleanup_command.arg(asm_file);
     };
     run_cmd(cleanup_command, debug_level);
     if run_output {
-        let mut run_command = Command::new(output_file);
+        let mut run_command = Command::new("./".to_owned() + output_file.as_str());
         run_command.args(execute_args.split(' '));
         run_cmd(run_command, debug_level);
     };
