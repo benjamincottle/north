@@ -2,7 +2,7 @@
 :b stdin 0
 
 :i returncode 0
-:b stdout 164
+:b stdout 169
 400
 13
 8
@@ -46,6 +46,7 @@ ackermann:
 5
 tuptuo/.
 Hello World! !dlroW olleH
+1230
 
 :b stderr 0
 

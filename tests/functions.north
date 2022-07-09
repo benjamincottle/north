@@ -104,3 +104,4 @@ done
 "Hello World! " 1 1 syscall3 drop
 "Hello World!" swap drop revstr dup strlen swap 1 1 syscall3 drop
 "\n" 1 1 syscall3 drop
+"1234" swap drop atoi 4 - print
