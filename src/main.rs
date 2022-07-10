@@ -239,12 +239,14 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
     eprintln!("{}", input_line);
 //    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold());
     eprintln!("{}{}", " ".repeat(token_loc.2), "^");
+    let mut escaped_error_message = String::new();
+    error_msg.chars().for_each(|c| if c == "\n".chars().next().unwrap() {  escaped_error_message.push('\\'); escaped_error_message.push('n'); } else { escaped_error_message.push(c);});
     eprintln!(
         "{}:{}:{}: {}",
         token_loc.0.display(),
         token_loc.1,
         token_loc.2,
-        error_msg
+        escaped_error_message
     );
 }
 
@@ -1606,7 +1608,7 @@ fn preprocessor_include(
                     next_token.0.clone(),
                     format!(
                         "ERROR include file `{}` not found",
-                        include_file.trim_start().trim_end()
+                        include_file.strip_prefix("\"").unwrap().strip_suffix("\"").unwrap()
                     )
                     .as_str(),
                 );

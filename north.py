@@ -1021,7 +1021,7 @@ def preprocessor_function(tokens):
                 exit(1)
             next_token = tokens[1]
             try:
-                assert (next_token[1][0] == "identifier"), "ERROR invalid function name type `%s`, expected `identifier`" % (tokens[0][1][0])
+                assert (next_token[1][0] == "identifier"), "ERROR invalid function name type `%s`, expected `identifier`" % (next_token[1][0])
             except AssertionError as error_msg:
                 print_compilation_error(tokens[1], error_msg)
                 exit(1)
@@ -1206,6 +1206,9 @@ def parse_line(file_path, line_num, line):
             line = line[1:]
             cur_column += 1
         elif line[0] == "\"":                   # string literal begin
+            if (len(token) != 0):
+                print_compilation_error((((file_path, line_num, col_num), token)), ("ERROR tokens should be separated by whitespace `%s`" % token).encode('unicode-escape').decode('utf-8'))
+                exit(1)  
             token += line[0]
             line = line[1:]
             col_num = cur_column
