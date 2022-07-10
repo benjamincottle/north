@@ -237,7 +237,7 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
         input_line
     };
     eprintln!("{}", input_line);
-//    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold());
+//    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold()); // TODO colours!
     eprintln!("{}{}", " ".repeat(token_loc.2), "^");
     let mut escaped_error_message = String::new();
     error_msg.chars().for_each(|c| if c == "\n".chars().next().unwrap() {  escaped_error_message.push('\\'); escaped_error_message.push('n'); } else { escaped_error_message.push(c);});
@@ -250,20 +250,19 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
     );
 }
 
-fn run_cmd(mut cmd: Command, debug_level: usize) {
+fn run_cmd(mut cmd: Command, debug_level: usize) -> i32 {
     match debug_level {
         0 => {
             if cmd.get_program() == "fasm" {
                 cmd.stdout(Stdio::null());
             };
-            cmd.status()
-                .expect("command failed to start");
-        }
+        },
         _ => {
             eprintln!("    [ {:?} {:?} ]", cmd.get_program(), cmd.get_args());
-            cmd.status().expect("command failed to start");
         }
     };
+    let status = cmd.status().expect(format!("ERROR command `{:?}` failed to start", cmd.get_program()).as_str());
+    status.code().unwrap()
 }
 
 fn compile_to_elf64_asm(
@@ -345,7 +344,7 @@ fn compile_to_elf64_asm(
             ProgramOp::PUSHINT => {
                 write!(
                     asm,
-                    "    mov     rax, {:#x}\n",
+                    "    mov     rax, {:#02x}\n",
                     program_op.1 .2.clone().unwrap().parse::<u64>().unwrap()
                 )
                 .unwrap();
@@ -379,7 +378,7 @@ fn compile_to_elf64_asm(
                 match program[index - 1].1 .2.clone().unwrap().parse::<f64>() {
                     Ok(explicit_divisor) => {
                         let opt_divisor: u64 = (2_f64.powf(64.0) / explicit_divisor) as u64;
-                        write!(asm, "    mov     rcx, {:#x}\n", opt_divisor).unwrap();
+                        write!(asm, "    mov     rcx, {:#02x}\n", opt_divisor).unwrap();
                         write!(asm, "    mul     rcx\n").unwrap();
                         write!(asm, "    push    rdx\n").unwrap();
                     }
@@ -732,7 +731,7 @@ fn compile_to_elf64_asm(
                     str_data.push(program_op.1 .2.clone().unwrap());
                 };
                 let str_len = program_op.1 .2.clone().unwrap().len();
-                write!(asm, "    push    {:#x}\n", (str_len)).unwrap();
+                write!(asm, "    push    {:#04x}\n", (str_len)).unwrap();
                 let str_index = str_data
                     .iter()
                     .position(|r| r == &program_op.1 .2.clone().unwrap())
@@ -881,9 +880,9 @@ fn compile_to_elf64_asm(
             };
             hex_str.pop();
             if hex_str.len() > 0 {
-                hex_str.extend(",0x0".chars());
+                hex_str.extend(",0x00".chars());
             } else {
-                hex_str.extend("0x0".chars());
+                hex_str.extend("0x00".chars());
             }
             write!(asm, "    {}: db {}\n", str_label, hex_str).unwrap();
         }
@@ -1679,9 +1678,13 @@ fn parse_line(
         // string literal begin
         else if c == '\"' {
             if token.len() != 0 {
+                let error_message = format!(
+                    "ERROR tokens should be separated by whitespace `{}`",
+                    token
+                );
                 print_compilation_message(
-                    (path.clone(), line_num, cur_column),
-                    "ERROR: tokens should be separated by whitespace",
+                    (path.clone(), line_num, col_num),
+                    error_message.as_str()
                 );
                 std::process::exit(1);
             };
@@ -1709,7 +1712,7 @@ fn parse_line(
                             token.push('\\');
                         } else {
                             return Err(std::io::Error::new(
-                                // TODO: more error reporting
+                                // TODO: more error reporting here
                                 std::io::ErrorKind::InvalidData,
                                 format!("Invalid escape sequence: \\{}", c),
                             ));
@@ -1725,11 +1728,8 @@ fn parse_line(
                 else if c == '\"' {
                     token.push(c); // push the last quote
                     if line.len() > 0 && !line.starts_with(" ") {
-                        // let escaped_token =
-                            // token.escape_default().to_string().as_str().to_string();    
                         let error_message = format!(
                             "ERROR tokens should be separated by whitespace `{}`",
-                            // escaped_token
                             token
                         );
                         print_compilation_message(
@@ -1792,9 +1792,7 @@ fn parse_line(
                     token.push(c); // push the last quote
                                    // TODO: at the moment `💖` is invalid and reported as `'\u{1f496}'` instead of `💖`
                     if token.len() != 3 {
-                        // let escaped_token = token.escape_default().to_string();
                         let error_message =
-                            // format!("ERROR invalid character literal `{}`", escaped_token);
                             format!("ERROR invalid character literal `{}`", token);
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
@@ -1803,10 +1801,8 @@ fn parse_line(
                         std::process::exit(1);
                     };
                     if line.len() > 0 && !line.starts_with(" ") {
-                        // let escaped_token = token.escape_default().to_string();
                         let error_message = format!(
                             "ERROR tokens should be separated by whitespace `{}`",
-                            // escaped_token
                             token
                         );
                         print_compilation_message(
@@ -1872,15 +1868,11 @@ fn parse_line(
     }
 
     if token.matches("\"").count() == 1 {
-        // let escaped_token = token.escape_default().to_string();
-        // let error_message = format!("ERROR invalid string literal `{}`", escaped_token);
         let error_message = format!("ERROR invalid string literal `{}`", token);
         print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
         std::process::exit(1);
     };
     if token.matches("'").count() == 1 {
-        // let escaped_token = token.escape_default().to_string();
-        // let error_message = format!("ERROR invalid character literal `{}`", escaped_token);
         let error_message = format!("ERROR invalid character literal `{}`", token);
         print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
         std::process::exit(1);
@@ -2044,6 +2036,7 @@ fn main() {
     if run_output {
         let mut run_command = Command::new("./".to_owned() + output_file.as_str());
         run_command.args(execute_args.split(' '));
-        run_cmd(run_command, debug_level);
+        let exit_code = run_cmd(run_command, debug_level);
+        std::process::exit(exit_code);
     };
 }
