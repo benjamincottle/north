@@ -115,9 +115,9 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
 
     if tc is not None:
         if len(tc.argv) != 0:
-            com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
+            com = cmd_run_echoed(["./target/debug/northc", "-a", assembler, "-r", "-e", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
         else:
-            com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
+            com = cmd_run_echoed(["./target/debug/northc", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
         if com.returncode != tc.returncode or com.stdout != tc.stdout or com.stderr != tc.stderr:
             print("[ERROR] Unexpected output ------------------------------------------")
             print("  >> Expected:")
@@ -135,7 +135,7 @@ def run_test_for_file(file_path: str, stats: RunStats = RunStats()):
             stats.passed += 1
     else:
         print('[WARNING] Could not find any input/output data for %s. Ignoring testing. Only checking if it compiles.' % file_path)
-        com = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-o", "output", file_path], capture_output=True)
+        com = cmd_run_echoed(["./target/debug/northc", "-a", assembler, "-o", "output", file_path], capture_output=True)
         if com.returncode != 0:
             error = True
             stats.failed += 1
@@ -191,9 +191,9 @@ def update_output_for_file(file_path: str):
 
 
     if len(tc.argv) != 0:
-        output = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-rA", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
+        output = cmd_run_echoed(["./target/debug/northc", "-a", assembler, "-r", "-e", *tc.argv, "-o", "output", file_path], input=tc.stdin, capture_output=True)
     else:
-        output = cmd_run_echoed([sys.executable, "north.py", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
+        output = cmd_run_echoed(["./target/debug/northc", "-a", assembler, "-r", "-o", "output", file_path], input=tc.stdin, capture_output=True)
     print("[INFO] Saving output to %s" % tc_path)
     save_test_case(tc_path,
                    tc.argv, tc.stdin,
