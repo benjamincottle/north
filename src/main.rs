@@ -2,7 +2,7 @@ use clap::{ArgEnum, CommandFactory, ErrorKind, Parser};
 use colored::Colorize;
 use phf::phf_map;
 use std::collections::HashMap;
-use std::fs;
+use std::{fs, fmt};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
@@ -57,6 +57,19 @@ enum TokenType {
     Char,
     Identifier,
     Label,
+}
+
+impl fmt::Display for TokenType {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match self {
+            TokenType::Builtin => write!(f, "builtin"),
+            TokenType::Uint => write!(f, "uint"),
+            TokenType::String => write!(f, "string"),
+            TokenType::Char => write!(f, "char"),
+            TokenType::Identifier => write!(f, "identifier"),
+            TokenType::Label => write!(f, "label"),
+        }
+    }
 }
 
 #[derive(Hash, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Debug)]
@@ -503,7 +516,7 @@ fn compile_to_elf64_asm(
                 write!(asm, "    cmp     rax, 0\n").unwrap();
                 write!(asm, "    je      .L{}a\n", index).unwrap();
                 write!(asm, "    push    rax\n").unwrap();
-                write!(asm, ".L%{}a:\n", index).unwrap();
+                write!(asm, ".L{}a:\n", index).unwrap();
             }
             ProgramOp::MAX => {
                 write!(asm, "    pop     rax\n").unwrap();
@@ -650,7 +663,7 @@ fn compile_to_elf64_asm(
             ProgramOp::IF => {
                 write!(asm, "    pop     rax\n").unwrap();
                 write!(asm, "    cmp     rax, 0x0\n").unwrap();
-                write!(asm, "    je     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
+                write!(asm, "    je      .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
             }
             ProgramOp::ELSE => {
                 write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
@@ -788,9 +801,9 @@ fn compile_to_elf64_asm(
                     .unwrap();
                 let returns_count = function.2.len();
                 if returns_count > 0 {
-                    write!(asm, "    pop    rax\n").unwrap();
+                    write!(asm, "    pop     rax\n").unwrap();
                 };
-                write!(asm, "    pop    rbp\n").unwrap();
+                write!(asm, "    pop     rbp\n").unwrap();
                 write!(asm, "    ret\n").unwrap();
             }
             ProgramOp::FUNCDEF => {
@@ -1085,7 +1098,7 @@ fn locate_blocks(
         std::process::exit(1);
     };
     if if_stack.len() != 0 {
-        let unmatched_token_index = while_stack.pop().unwrap().0;
+        let unmatched_token_index = if_stack.pop().unwrap().0;
         let unmatched_token = program[unmatched_token_index].clone();
         let builtin_type = unmatched_token.1 .1.clone();
         let error_message: &str = if builtin_type == ProgramOp::IF {
@@ -1158,11 +1171,11 @@ fn parse_tokens(
             TokenType::String => {
                 program.push((
                     token.0.clone(),
-                    (token.1 .0, ProgramOp::PUSHSTR, Some(token_data.clone().trim_end_matches("\"").trim_start_matches("\"").to_string())),
+                    (token.1 .0, ProgramOp::PUSHSTR, Some(token_data.clone().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap().to_string())),
                 ));
             }
             TokenType::Char => {
-                let token_data = (token_data.chars().next().unwrap() as u32).to_string();
+                let token_data = (token_data.clone().strip_prefix("\'").unwrap().strip_suffix("\'").unwrap().chars().next().unwrap() as u32).to_string();
                 program.push((
                     token.0.clone(),
                     (token.1 .0, ProgramOp::PUSHINT, Some(token_data)),
@@ -1174,6 +1187,9 @@ fn parse_tokens(
                         token.0.clone(),
                         (token.1 .0, ProgramOp::FUNCCALL, Some(token_data.clone())),
                     ));
+                } else {
+                    print_compilation_message(token.0.clone(), format!("ERROR invalid token `{}`",  token.1.1.clone()).as_str());
+                    std::process::exit(1);
                 };
             }
             TokenType::Label => {
@@ -1227,7 +1243,7 @@ fn preprocessor_function(
         let token = tokens.remove(0).clone();
         let token_data = token.1 .1.clone();
         if token_data == "def" {
-            if tokens.len() < 2 {
+            if tokens.len() == 0 {
                 print_compilation_message(
                     token.0.clone(),
                     "ERROR invalid function definition, expected function name",
@@ -1238,8 +1254,8 @@ fn preprocessor_function(
                 print_compilation_message(
                     tokens[0].0.clone(),
                     (format!(
-                        "ERROR invalid function name type `{:?}`, expected `identifier`",
-                        tokens[0].1 .0
+                        "ERROR invalid function name type `{}`, expected `identifier`",
+                        tokens[0].1 .0.to_string()
                     ))
                     .as_str(),
                 );
@@ -1307,8 +1323,8 @@ fn preprocessor_function(
                     print_compilation_message(
                         tokens[0].0.clone(),
                         (format!(
-                            "ERROR invalid function argument type `{:?}`, expected `identifier`",
-                            tokens[0].1 .0
+                            "ERROR invalid function argument type `{}`, expected `identifier`",
+                            tokens[0].1 .0.to_string()
                         ))
                         .as_str(),
                     );
@@ -1332,8 +1348,8 @@ fn preprocessor_function(
                     print_compilation_message(
                         tokens[0].0.clone(),
                         (format!(
-                            "ERROR invalid function return type `{:?}`, expected `identifier`",
-                            tokens[0].1 .0
+                            "ERROR invalid function return type `{}`, expected `identifier`",
+                            tokens[0].1 .0.to_string()
                         ))
                         .as_str(),
                     );
@@ -1540,7 +1556,7 @@ fn preprocessor_include(
                 print_compilation_message(next_token.0.clone(), "ERROR invalid `#include` file");
                 std::process::exit(1);
             }
-            if next_token_data
+            if next_token_data // TODO: trim_start replacces with strip_prefix
                 .trim_start()
                 .trim_end()
                 .matches(parent_file.file_stem().unwrap().to_str().unwrap())
@@ -1556,8 +1572,8 @@ fn preprocessor_include(
             if next_token_data.contains("/") {
                 print_compilation_message(
                     next_token.0.clone(),
-                    "ERROR `#include` can not be a path. Additional search paths not implemented",
-                )
+                    "ERROR `#include` can not be a path. Additional search paths not implemented");
+                std::process::exit(1);
             }
             let include_file = next_token_data;
             let include_file_path = if include_file.starts_with("<") && include_file.ends_with(">")
@@ -1590,7 +1606,7 @@ fn preprocessor_include(
                     next_token.0.clone(),
                     format!(
                         "ERROR include file `{}` not found",
-                        include_file_path.to_str().unwrap()
+                        include_file.trim_start().trim_end()
                     )
                     .as_str(),
                 );
@@ -1660,6 +1676,13 @@ fn parse_line(
         }
         // string literal begin
         else if c == '\"' {
+            if token.len() != 0 {
+                print_compilation_message(
+                    (path.clone(), line_num, cur_column),
+                    "ERROR: tokens should be separated by whitespace",
+                );
+                std::process::exit(1);
+            };
             col_num = cur_column;
             token_type = TokenType::String;
             cur_column += 1;
@@ -1678,6 +1701,8 @@ fn parse_line(
                             token.push('\r');
                         } else if c == '\"' {
                             token.push('\"');
+                        } else if c == '\'' {
+                            token.push('\'');                            
                         } else if c == '\\' {
                             token.push('\\');
                         } else {
@@ -1696,12 +1721,14 @@ fn parse_line(
                 }
                 // string literal end
                 else if c == '\"' {
+                    token.push(c); // push the last quote
                     if line.len() > 0 && !line.starts_with(" ") {
-                        let escaped_token =
-                            "\"".to_string() + token.escape_default().to_string().as_str() + "\"";
+                        // let escaped_token =
+                            // token.escape_default().to_string().as_str().to_string();    
                         let error_message = format!(
                             "ERROR tokens should be separated by whitespace `{}`",
-                            escaped_token
+                            // escaped_token
+                            token
                         );
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
@@ -1709,7 +1736,6 @@ fn parse_line(
                         );
                         std::process::exit(1);
                     }
-                    token.push(c); // push the last quote
                     result.push(((path.clone(), line_num, col_num), (token_type, token)));
                     token = "".to_string();
                     cur_column += 1;
@@ -1742,6 +1768,8 @@ fn parse_line(
                             token.push('\r');
                         } else if c == '\"' {
                             token.push('\"');
+                        } else if c == '\'' {
+                            token.push('\'');                            
                         } else if c == '\\' {
                             token.push('\\');
                         } else {
@@ -1762,9 +1790,10 @@ fn parse_line(
                     token.push(c); // push the last quote
                                    // TODO: at the moment `💖` is invalid and reported as `'\u{1f496}'` instead of `💖`
                     if token.len() != 3 {
-                        let escaped_token = token.escape_default().to_string();
+                        // let escaped_token = token.escape_default().to_string();
                         let error_message =
-                            format!("ERROR invalid character literal `{}`", escaped_token);
+                            // format!("ERROR invalid character literal `{}`", escaped_token);
+                            format!("ERROR invalid character literal `{}`", token);
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
@@ -1772,10 +1801,11 @@ fn parse_line(
                         std::process::exit(1);
                     };
                     if line.len() > 0 && !line.starts_with(" ") {
-                        let escaped_token = token.escape_default().to_string();
+                        // let escaped_token = token.escape_default().to_string();
                         let error_message = format!(
                             "ERROR tokens should be separated by whitespace `{}`",
-                            escaped_token
+                            // escaped_token
+                            token
                         );
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
@@ -1840,14 +1870,16 @@ fn parse_line(
     }
 
     if token.matches("\"").count() == 1 {
-        let escaped_token = token.escape_default().to_string();
-        let error_message = format!("ERROR invalid string literal `{}`", escaped_token);
+        // let escaped_token = token.escape_default().to_string();
+        // let error_message = format!("ERROR invalid string literal `{}`", escaped_token);
+        let error_message = format!("ERROR invalid string literal `{}`", token);
         print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
         std::process::exit(1);
     };
     if token.matches("'").count() == 1 {
-        let escaped_token = token.escape_default().to_string();
-        let error_message = format!("ERROR invalid character literal `{}`", escaped_token);
+        // let escaped_token = token.escape_default().to_string();
+        // let error_message = format!("ERROR invalid character literal `{}`", escaped_token);
+        let error_message = format!("ERROR invalid character literal `{}`", token);
         print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
         std::process::exit(1);
     };
@@ -1898,7 +1930,7 @@ fn load_tokens(
         println!("load_tokens(): \n{:?}\n", tokens.clone());
     }
     if tokens.len() == 0 {
-        eprintln!("ERROR empty input file `{}`", path.display());
+        eprintln!("{}:0:0: ERROR empty input file", path.display());
         std::process::exit(1);
     }
     Ok(tokens)
