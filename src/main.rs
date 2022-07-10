@@ -2,11 +2,11 @@ use clap::{ArgEnum, CommandFactory, ErrorKind, Parser};
 use colored::Colorize;
 use phf::phf_map;
 use std::collections::HashMap;
-use std::{fs, fmt};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
+use std::{fmt, fs};
 
 const MAX_INCLUDE_DEPTH: u32 = 58;
 const MEMORY_SIZE: &str = "0x1f400";
@@ -237,10 +237,17 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
         input_line
     };
     eprintln!("{}", input_line);
-//    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold()); // TODO colours!
+    //    eprintln!("{}{}", " ".repeat(token_loc.2), "^".bright_yellow().bold()); // TODO colours!
     eprintln!("{}{}", " ".repeat(token_loc.2), "^");
     let mut escaped_error_message = String::new();
-    error_msg.chars().for_each(|c| if c == "\n".chars().next().unwrap() {  escaped_error_message.push('\\'); escaped_error_message.push('n'); } else { escaped_error_message.push(c);});
+    error_msg.chars().for_each(|c| {
+        if c == "\n".chars().next().unwrap() {
+            escaped_error_message.push('\\');
+            escaped_error_message.push('n');
+        } else {
+            escaped_error_message.push(c);
+        }
+    });
     eprintln!(
         "{}:{}:{}: {}",
         token_loc.0.display(),
@@ -256,12 +263,14 @@ fn run_cmd(mut cmd: Command, debug_level: usize) -> i32 {
             if cmd.get_program() == "fasm" {
                 cmd.stdout(Stdio::null());
             };
-        },
+        }
         _ => {
             eprintln!("    [ {:?} {:?} ]", cmd.get_program(), cmd.get_args());
         }
     };
-    let status = cmd.status().expect(format!("ERROR command `{:?}` failed to start", cmd.get_program()).as_str());
+    let status = cmd
+        .status()
+        .expect(format!("ERROR command `{:?}` failed to start", cmd.get_program()).as_str());
     status.code().unwrap()
 }
 
@@ -877,7 +886,7 @@ fn compile_to_elf64_asm(
             let mut hex_str = String::new();
             for byte in static_str.bytes() {
                 hex_str.push_str(&format!("0x{:02x},", byte));
-            };
+            }
             hex_str.pop();
             if hex_str.len() > 0 {
                 hex_str.extend(",0x00".chars());
@@ -1172,11 +1181,32 @@ fn parse_tokens(
             TokenType::String => {
                 program.push((
                     token.0.clone(),
-                    (token.1 .0, ProgramOp::PUSHSTR, Some(token_data.clone().strip_prefix("\"").unwrap().strip_suffix("\"").unwrap().to_string())),
+                    (
+                        token.1 .0,
+                        ProgramOp::PUSHSTR,
+                        Some(
+                            token_data
+                                .clone()
+                                .strip_prefix("\"")
+                                .unwrap()
+                                .strip_suffix("\"")
+                                .unwrap()
+                                .to_string(),
+                        ),
+                    ),
                 ));
             }
             TokenType::Char => {
-                let token_data = (token_data.clone().strip_prefix("\'").unwrap().strip_suffix("\'").unwrap().chars().next().unwrap() as u32).to_string();
+                let token_data = (token_data
+                    .clone()
+                    .strip_prefix("\'")
+                    .unwrap()
+                    .strip_suffix("\'")
+                    .unwrap()
+                    .chars()
+                    .next()
+                    .unwrap() as u32)
+                    .to_string();
                 program.push((
                     token.0.clone(),
                     (token.1 .0, ProgramOp::PUSHINT, Some(token_data)),
@@ -1189,7 +1219,10 @@ fn parse_tokens(
                         (token.1 .0, ProgramOp::FUNCCALL, Some(token_data.clone())),
                     ));
                 } else {
-                    print_compilation_message(token.0.clone(), format!("ERROR invalid token `{}`",  token.1.1.clone()).as_str());
+                    print_compilation_message(
+                        token.0.clone(),
+                        format!("ERROR invalid token `{}`", token.1 .1.clone()).as_str(),
+                    );
                     std::process::exit(1);
                 };
             }
@@ -1362,10 +1395,7 @@ fn preprocessor_function(
             if tokens[0].1 .1 != "{" {
                 print_compilation_message(
                     tokens[0].0.clone(),
-                    (format!(
-                        "ERROR invalid function definition, expected `{{`"
-                    ))
-                    .as_str(),
+                    (format!("ERROR invalid function definition, expected `{{`")).as_str(),
                 );
                 std::process::exit(1);
             };
@@ -1464,7 +1494,7 @@ fn preprocessor_define(
                 print_compilation_message(token.0.clone(), "ERROR `#define` missing define name");
                 std::process::exit(1);
             };
-            if tokens[0].1.0 != TokenType::Identifier {
+            if tokens[0].1 .0 != TokenType::Identifier {
                 print_compilation_message(tokens[0].0.clone(), "ERROR invalid `#define` name");
                 std::process::exit(1);
             };
@@ -1573,7 +1603,8 @@ fn preprocessor_include(
             if next_token_data.contains("/") {
                 print_compilation_message(
                     next_token.0.clone(),
-                    "ERROR `#include` can not be a path. Additional search paths not implemented");
+                    "ERROR `#include` can not be a path. Additional search paths not implemented",
+                );
                 std::process::exit(1);
             }
             let include_file = next_token_data;
@@ -1607,7 +1638,11 @@ fn preprocessor_include(
                     next_token.0.clone(),
                     format!(
                         "ERROR include file `{}` not found",
-                        include_file.strip_prefix("\"").unwrap().strip_suffix("\"").unwrap()
+                        include_file
+                            .strip_prefix("\"")
+                            .unwrap()
+                            .strip_suffix("\"")
+                            .unwrap()
                     )
                     .as_str(),
                 );
@@ -1678,13 +1713,11 @@ fn parse_line(
         // string literal begin
         else if c == '\"' {
             if token.len() != 0 {
-                let error_message = format!(
-                    "ERROR tokens should be separated by whitespace `{}`",
-                    token
-                );
+                let error_message =
+                    format!("ERROR tokens should be separated by whitespace `{}`", token);
                 print_compilation_message(
                     (path.clone(), line_num, col_num),
-                    error_message.as_str()
+                    error_message.as_str(),
                 );
                 std::process::exit(1);
             };
@@ -1707,7 +1740,7 @@ fn parse_line(
                         } else if c == '\"' {
                             token.push('\"');
                         } else if c == '\'' {
-                            token.push('\'');                            
+                            token.push('\'');
                         } else if c == '\\' {
                             token.push('\\');
                         } else {
@@ -1728,10 +1761,8 @@ fn parse_line(
                 else if c == '\"' {
                     token.push(c); // push the last quote
                     if line.len() > 0 && !line.starts_with(" ") {
-                        let error_message = format!(
-                            "ERROR tokens should be separated by whitespace `{}`",
-                            token
-                        );
+                        let error_message =
+                            format!("ERROR tokens should be separated by whitespace `{}`", token);
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
@@ -1771,7 +1802,7 @@ fn parse_line(
                         } else if c == '\"' {
                             token.push('\"');
                         } else if c == '\'' {
-                            token.push('\'');                            
+                            token.push('\'');
                         } else if c == '\\' {
                             token.push('\\');
                         } else {
@@ -1792,8 +1823,7 @@ fn parse_line(
                     token.push(c); // push the last quote
                                    // TODO: at the moment `💖` is invalid and reported as `'\u{1f496}'` instead of `💖`
                     if token.len() != 3 {
-                        let error_message =
-                            format!("ERROR invalid character literal `{}`", token);
+                        let error_message = format!("ERROR invalid character literal `{}`", token);
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
@@ -1801,10 +1831,8 @@ fn parse_line(
                         std::process::exit(1);
                     };
                     if line.len() > 0 && !line.starts_with(" ") {
-                        let error_message = format!(
-                            "ERROR tokens should be separated by whitespace `{}`",
-                            token
-                        );
+                        let error_message =
+                            format!("ERROR tokens should be separated by whitespace `{}`", token);
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
