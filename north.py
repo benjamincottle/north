@@ -657,7 +657,7 @@ def compile_to_elf64_asm(program, function_defs, required_labels, output_file): 
         if str_data != []:
             for string in list(enumerate(str_data)):
                 str_label = "str%d" % (string[0])
-                str_data = string[1] + ",0x0" if string[1] else "0x0"
+                str_data = string[1] + ",0x00" if string[1] else "0x00"
                 asm.write("    " + str_label + ": db " + str_data + "\n")
         if assembler == "nasm":
             asm.write("section .bss\n")                 # .bss section
@@ -901,7 +901,7 @@ def parse_tokens(tokens, function_defs):  # tokens = [ ... , ((file, line, col),
         elif token_data == "syscall6":
             program.append((token_loc, (token_type, Builtin.OP_SYSCALL_6)))     
         elif token_data[0] + token_data[-1] == "\"\"":
-            token_data = "".join([",0x%0x" % ord(c) for c in bytes(token_data[1:-1], "utf-8").decode("unicode-escape")])[1:]
+            token_data = "".join([",0x%02x" % ord(c) for c in bytes(token_data[1:-1], "utf-8").decode("unicode-escape")])[1:]
             program.append((token_loc, (token_type, Builtin.OP_PUSH_STR, token_data)))
         elif token_data[0] + token_data[-1] == "\'\'":
             program.append((token_loc, (token_type, Builtin.OP_PUSH_INT, ord(bytes(token_data[1:-1], "utf-8").decode("unicode-escape")))))
