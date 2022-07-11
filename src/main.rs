@@ -1,5 +1,5 @@
 use clap::{ArgEnum, CommandFactory, ErrorKind, Parser};
-use colored::Colorize;
+//use colored::Colorize;
 use phf::phf_map;
 use std::collections::HashMap;
 use std::fs::File;
@@ -250,7 +250,7 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
     });
     eprintln!(
         "{}:{}:{}: {}",
-        token_loc.0.display(),
+        token_loc.0.file_name().unwrap().to_str().unwrap(),
         token_loc.1,
         token_loc.2,
         escaped_error_message
@@ -1925,7 +1925,11 @@ fn load_tokens(
     debug_level: usize,
 ) -> std::io::Result<Vec<((PathBuf, usize, usize), (TokenType, String))>> {
     if !fs::metadata(path).is_ok() {
-        eprintln!("ERROR input file `{}` not found", path.display());
+        eprintln!("ERROR input file `{}` not found", path.as_path().file_name().unwrap().to_str().unwrap());
+        std::process::exit(1);
+    };
+    if !fs::metadata(path).unwrap().is_file() {
+        eprintln!("ERROR input file `{}` not a file", path.as_path().file_name().unwrap().to_str().unwrap());
         std::process::exit(1);
     };
     let contents = std::fs::read_to_string(path)?;
@@ -1952,7 +1956,7 @@ fn load_tokens(
         println!("load_tokens(): \n{:?}\n", tokens.clone());
     }
     if tokens.len() == 0 {
-        eprintln!("{}:0:0: ERROR empty input file", path.display());
+        eprintln!("{}:0:0: ERROR empty input file", path.as_path().file_name().unwrap().to_str().unwrap());
         std::process::exit(1);
     }
     Ok(tokens)
