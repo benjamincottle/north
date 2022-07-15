@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 145
+:b stderr 137
 #define MAX_LEN_OF_MAC_TABLE       64
         ^
-./tests/invalid_preprocessor_9.north:4:8: ERROR `#define` redefinition of `MAX_LEN_OF_MAC_TABLE`
+invalid_preprocessor_9.north:4:8: ERROR `#define` redefinition of `MAX_LEN_OF_MAC_TABLE`
 

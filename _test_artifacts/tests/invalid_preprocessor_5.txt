@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 91
+:b stderr 83
 #include
 ^
-./tests/invalid_preprocessor_5.north:0:0: ERROR `#include` missing include file
+invalid_preprocessor_5.north:0:0: ERROR `#include` missing include file
 

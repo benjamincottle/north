@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 104
+:b stderr 96
 def name (a b -- c ) {
     ^
-./tests/invalid_function_3.north:4:4: ERROR duplicate function name `name`
+invalid_function_3.north:4:4: ERROR duplicate function name `name`
 

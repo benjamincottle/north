@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 100
+:b stderr 92
 continue
 ^
-./tests/invalid_unmatched_13.north:29:0: ERROR `continue` not valid outside `while` loop
+invalid_unmatched_13.north:29:0: ERROR `continue` not valid outside `while` loop
 

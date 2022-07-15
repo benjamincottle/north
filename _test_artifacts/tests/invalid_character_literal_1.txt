@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 99
+:b stderr 91
    'ab'
    ^
-./tests/invalid_character_literal_1.north:2:3: ERROR invalid character literal `'ab'`
+invalid_character_literal_1.north:2:3: ERROR invalid character literal `'ab'`
 

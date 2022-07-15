@@ -990,7 +990,6 @@ fn locate_blocks(
                             break_labels.push(while_stack.pop().unwrap().0);
                         }
                         ProgramOp::DO => {
-                            // eprintln!("while_stack {:?}", while_stack);
                             if while_stack[while_stack.len() - 2].1 .1 .1 != ProgramOp::WHILE {
                                 print_compilation_message(
                                     program[while_stack.last().unwrap().0.clone()].0.clone(),

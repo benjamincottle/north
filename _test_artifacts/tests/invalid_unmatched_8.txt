@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 81
+:b stderr 73
 endif
 ^
-./tests/invalid_unmatched_8.north:2:0: ERROR missing `if` before `endif`
+invalid_unmatched_8.north:2:0: ERROR missing `if` before `endif`
 

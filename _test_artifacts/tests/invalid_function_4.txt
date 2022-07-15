@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 127
+:b stderr 119
 def name a b -- c ) {
          ^
-./tests/invalid_function_4.north:0:9: ERROR invalid function argument definiton, expected `(`
+invalid_function_4.north:0:9: ERROR invalid function argument definiton, expected `(`
 

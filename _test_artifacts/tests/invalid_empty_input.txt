@@ -4,6 +4,6 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 62
-./tests/invalid_empty_input.north:0:0: ERROR empty input file
+:b stderr 54
+invalid_empty_input.north:0:0: ERROR empty input file
 

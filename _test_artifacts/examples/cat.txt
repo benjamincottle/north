@@ -1,32 +1,10 @@
 :i argc 1
-:b arg0 31
-/etc/nsswitch.conf - /etc/hosts
-:b stdin 3
-AA
+:b arg0 10
+/etc/hosts
+:b stdin 0
 
 :i returncode 0
-:b stdout 765
-# /etc/nsswitch.conf
-#
-# Example configuration of GNU Name Service Switch functionality.
-# If you have the `glibc-doc-reference' and `info' packages installed, try:
-# `info libc "Name Service Switch"' for information about this file.
-
-passwd:         files systemd
-group:          files systemd
-shadow:         files
-gshadow:        files
-
-hosts:          files mdns4_minimal [NOTFOUND=return] dns
-networks:       files
-
-protocols:      db files
-services:       db files
-ethers:         db files
-rpc:            db files
-
-netgroup:       nis
-AA
+:b stdout 220
 127.0.0.1	localhost
 127.0.1.1	local
 

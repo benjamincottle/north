@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 88
+:b stderr 80
 invalid keyword: '$'
 ^
-./tests/invalid_keyword.north:0:0: ERROR invalid token `invalid`
+invalid_keyword.north:0:0: ERROR invalid token `invalid`
 

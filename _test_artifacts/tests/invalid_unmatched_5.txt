@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 79
+:b stderr 71
 else
 ^
-./tests/invalid_unmatched_5.north:0:0: ERROR missing `if` before `else`
+invalid_unmatched_5.north:0:0: ERROR missing `if` before `else`
 

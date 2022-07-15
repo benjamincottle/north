@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 94
+:b stderr 86
 #define 7 89
         ^
-./tests/invalid_preprocessor_7.north:0:8: ERROR invalid `#define` name
+invalid_preprocessor_7.north:0:8: ERROR invalid `#define` name
 

@@ -1,9 +1,8 @@
-use subprocess::{Exec, Redirection, ExitStatus};
-use predicates::prelude::*;
-use std::fs;
-use std::path::PathBuf;
+use easy_process::{self};
+use std::fs::{self};
+use std::path::{PathBuf, Path};
 use std::io::{self, BufRead, Read};
-use pretty_assertions::{assert_eq, assert_ne};
+use colored::Colorize;
 
 macro_rules! function_name {
     () => {{
@@ -12,7 +11,6 @@ macro_rules! function_name {
             std::any::type_name::<T>()
         }
         let name = type_name_of(f);
-        // Find and cut the rest of the path
         match &name[..name.len() - 3].rfind(':') {
             Some(pos) => &name[pos + 1..name.len() - 3],
             None => &name[..name.len() - 3],
@@ -20,15 +18,28 @@ macro_rules! function_name {
     }};
 }
 
+#[derive(Debug)]
 struct TestCase {
     argv: Vec<Vec<u8>>,
     stdin: Vec<u8>,
-    return_code: subprocess::ExitStatus,
+    return_code: i32,
     stdout: Vec<u8>, 
     stderr: Vec<u8>,
 }
 
-fn read_int_field(input_data: Vec<u8>, field_name: &str) -> (Vec<u8>, u32) {
+impl Default for TestCase {
+    fn default() -> TestCase {
+        TestCase {
+            argv: vec![],
+            stdin: vec![],
+            return_code: 0i32,
+            stdout: vec![],
+            stderr: vec![], 
+        }
+    }
+}
+
+fn read_int_field(input_data: Vec<u8>, field_name: &str) -> (Vec<u8>, i32) {
     let mut cursor = io::Cursor::new(input_data);    
     let mut buf = vec![];
     cursor.read_until(b'\n', &mut buf).unwrap();
@@ -38,7 +49,7 @@ fn read_int_field(input_data: Vec<u8>, field_name: &str) -> (Vec<u8>, u32) {
     let field = [":i ".as_bytes(), field_name.as_bytes(), " ".as_bytes()].concat();
     let field_len = field.len();
     let (_, right) = line.split_at(field_len);
-    let int: u32 = right.iter().map(|&x| x as char).collect::<String>().parse().unwrap();
+    let int: i32 = right.iter().map(|&x| x as char).collect::<String>().parse().unwrap();
     cursor.read_to_end(&mut buf).unwrap();
     let test_case_data = buf.clone();
     buf.clear();
@@ -52,7 +63,8 @@ fn read_blob_field(input_data: Vec<u8>, field_name: &str) -> (Vec<u8>, Vec<u8>) 
     let mut field_buf = vec![0; field_size as usize];
     cursor.read_exact(&mut field_buf).unwrap();
     let blob = field_buf.clone(); 
-    cursor.read_until(b'\n', &mut field_buf).unwrap();
+    let mut nl_buf = vec![0; 1];
+    cursor.read_exact(&mut nl_buf).unwrap();
     field_buf.clear();
     cursor.read_to_end(&mut buf).unwrap();
     let test_case_data = buf.clone();
@@ -61,6 +73,9 @@ fn read_blob_field(input_data: Vec<u8>, field_name: &str) -> (Vec<u8>, Vec<u8>) 
 }
 
 fn load_test_case(file_path: &str) -> Option<TestCase> {
+    if !Path::new(file_path).exists() {
+        return Some(TestCase::default());
+    }
     let test_case_data = &fs::read(file_path).unwrap();
     let (mut test_case_data, argc) = read_int_field(test_case_data.clone(), "argc");
     let mut argv: Vec<Vec<u8>> = Vec::new();
@@ -73,7 +88,6 @@ fn load_test_case(file_path: &str) -> Option<TestCase> {
     let (test_case_data, return_code) = read_int_field(test_case_data.clone(), "returncode");
     let (test_case_data, stdout) = read_blob_field(test_case_data.clone(), "stdout");
     let (_test_case_data, stderr) = read_blob_field(test_case_data.clone(), "stderr");
-    let return_code = ExitStatus::Exited(return_code);
     Some(TestCase {
         argv,
         stdin,
@@ -89,63 +103,109 @@ fn run_test_case(case_name: &str) -> Result<(), Box<dyn std::error::Error>> {
     file_path.push_str(".txt");
     let test_case = load_test_case(file_path.as_str()).unwrap();
     let input_file = PathBuf::from("./tests/".to_owned() + case_name + ".north");
-    let compile_cmd = Exec::cmd("./target/debug/northc")
-        .args(&["-o", case_name, input_file.to_str().unwrap()])
-        .stdout(Redirection::Pipe)
-        .stderr(Redirection::Pipe)
-        .capture()?;
-    let compile_cmd_stdout = compile_cmd.stdout;
-    let compile_cmd_stderr = compile_cmd.stderr;
-    let compile_cmd_code = compile_cmd.exit_status;
-    if !compile_cmd_code.success() {
-        assert_eq!(true, predicate::eq(compile_cmd_code).eval(&test_case.return_code));
-        assert_eq!(true, predicate::eq(compile_cmd_stdout).eval(&test_case.stdout));
-        assert_eq!(true, predicate::eq(compile_cmd_stderr).eval(&test_case.stderr));
+    let mut output_stdout: Vec<u8>;
+    let mut output_stderr: Vec<u8>;
+    let mut output_code: i32;
+    let compile_cmd = "./target/debug/northc ".to_owned() + "-o " + case_name + " " + input_file.to_str().unwrap();
+    let compile_cmd = easy_process::run(&compile_cmd);
+    match compile_cmd {
+        Ok(output) => {
+            output_code = 0;
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        },
+        Err(easy_process::Error::Io(io_err)) => panic!("unexpected I/O Error: {:?}", io_err),
+        Err(easy_process::Error::Failure(ex, output)) => {
+            output_code = ex.code().unwrap();
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        }
+    }
+    if output_code != 0 {
+        assert_eq!(output_code, test_case.return_code, "{}", readable_assertion(case_name, "compile return code", test_case.return_code.to_string(), output_code.to_string()));
+        assert_eq!(output_stdout, test_case.stdout, "{}", readable_assertion(case_name, "compile stdout", test_case.stdout.iter().map(|&x| x as char).collect::<String>(), output_stdout.iter().map(|&x| x as char).collect::<String>()));
+        assert_eq!(output_stderr, test_case.stderr, "{}", readable_assertion(case_name, "compile stderr", test_case.stderr.iter().map(|&x| x as char).collect::<String>(), output_stderr.iter().map(|&x| x as char).collect::<String>()));
     } else {
         let argv = test_case.argv.iter().map(|x| x.iter().map(|&x| x as char).collect::<String>()).collect::<Vec<String>>();
-        let execute_cmd = Exec::cmd("./".to_owned() + &case_name)
-            .args(&argv)
-            .stdin(test_case.stdin)
-            .stdout(Redirection::Pipe)
-            .stderr(Redirection::Pipe)
-            .capture()?;
-        assert_eq!(true, predicate::eq(execute_cmd.exit_status).eval(&test_case.return_code));
-        assert_eq!(true, predicate::eq(execute_cmd.stdout).eval(&test_case.stdout));
-        assert_eq!(true, predicate::eq(execute_cmd.stderr).eval(&test_case.stderr));
+        let execute_cmd = "./".to_owned() + &case_name + " " + &argv.join(" ");
+        let execute_cmd = easy_process::run_with_stdin(&execute_cmd, |stdin| {
+            std::io::Write::write_all(stdin, &test_case.stdin)?;
+            easy_process::Result::Ok(())
+        });
+        match execute_cmd {
+            Ok(output) => {
+                output_code = 0;
+                output_stdout = output.stdout.as_bytes().to_vec();
+                output_stderr = output.stderr.as_bytes().to_vec();
+            },
+            Err(easy_process::Error::Io(io_err)) => panic!("unexpected I/O Error: {:?}", io_err),
+            Err(easy_process::Error::Failure(ex, output)) => {
+                output_code = ex.code().unwrap();
+                output_stdout = output.stdout.as_bytes().to_vec();
+                output_stderr = output.stderr.as_bytes().to_vec();
+            }
+        }
+        fs::remove_file("./".to_owned() + &case_name).unwrap();
+        assert_eq!(output_code, test_case.return_code, "{}", readable_assertion(case_name, "execute return code", test_case.return_code.to_string(), output_code.to_string()));
+        assert_eq!(output_stdout, test_case.stdout, "{}", readable_assertion(case_name, "execute stdout", test_case.stdout.iter().map(|&x| x as char).collect::<String>(), output_stdout.iter().map(|&x| x as char).collect::<String>()));
+        assert_eq!(output_stderr, test_case.stderr, "{}", readable_assertion(case_name, "execute stderr", test_case.stderr.iter().map(|&x| x as char).collect::<String>(), output_stderr.iter().map(|&x| x as char).collect::<String>()));
     };
-    fs::remove_file("./".to_owned() + &case_name)?;
     Ok(())
+}
+
+fn readable_assertion(case_name: &str, assert_type: &str, expected: String, got: String) -> String {
+    format!("\n===[ {} {} ] expected:\n{}\n===[ {} {} ] got:\n{}\n", case_name.cyan().bold(), assert_type.cyan(), expected.green(), case_name.cyan().bold(), assert_type.cyan(), got.red())
 }
 
 #[test]
 fn input_file_not_found() -> Result<(), Box<dyn std::error::Error>> {
-    let cmd = Exec::cmd("./target/debug/northc")
-        .arg("404.north")
-        .stdout(Redirection::Pipe)
-        .stderr(Redirection::Pipe)
-        .capture()?;
-    let stdout = cmd.stdout;
-    let stderr = cmd.stderr;
-    let code = cmd.exit_status;
-    assert_ne!(code, ExitStatus::Exited(0));
-    assert_eq!(stdout, "".as_bytes().to_vec());
-    assert_eq!(stderr, "ERROR input file `404.north` not found\n".as_bytes().to_vec());
+    let output_stdout: Vec<u8>;
+    let output_stderr: Vec<u8>;
+    let output_code: i32;
+    let compile_cmd = "./target/debug/northc 404.north";
+    let compile_cmd = easy_process::run(&compile_cmd);
+    match compile_cmd {
+        Ok(output) => {
+            output_code = 0;
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        },
+        Err(easy_process::Error::Io(io_err)) => panic!("unexpected I/O Error: {:?}", io_err),
+        Err(easy_process::Error::Failure(ex, output)) => {
+            output_code = ex.code().unwrap();
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        }
+    }
+    assert_ne!(output_code, 0, "{}", readable_assertion("input_file_not_found", "compile return code", 0.to_string(), output_code.to_string()));
+    assert_eq!(output_stdout, "".as_bytes().to_vec(), "{}", readable_assertion("input_file_not_found", "compile stdout", "".as_bytes().to_vec().iter().map(|&x| x as char).collect::<String>(), output_stdout.iter().map(|&x| x as char).collect::<String>()));
+    assert_eq!(output_stderr, "ERROR input file `404.north` not found\n".as_bytes().to_vec(), "{}", readable_assertion("input_file_not_found", "compile_stderr", "ERROR input file `404.north` not found\n".as_bytes().to_vec().iter().map(|&x| x as char).collect::<String>(), output_stderr.iter().map(|&x| x as char).collect::<String>()));
     Ok(())
 }
 
 #[test]
 fn input_file_is_directory() -> Result<(), Box<dyn std::error::Error>> {
-    let cmd = Exec::cmd("./target/debug/northc")
-        .arg("./tests")
-        .stdout(Redirection::Pipe)
-        .stderr(Redirection::Pipe)
-        .capture()?;
-    let stdout = cmd.stdout;
-    let stderr = cmd.stderr;
-    let code = cmd.exit_status;
-    assert_ne!(code, ExitStatus::Exited(0));
-    assert_eq!(stdout, "".as_bytes().to_vec());
-    assert_eq!(stderr, "ERROR input file `tests` not a file\n".as_bytes().to_vec());
+    let output_stdout: Vec<u8>;
+    let output_stderr: Vec<u8>;
+    let output_code: i32;
+    let compile_cmd = "./target/debug/northc ./tests";
+    let compile_cmd = easy_process::run(&compile_cmd);
+    match compile_cmd {
+        Ok(output) => {
+            output_code = 0;
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        },
+        Err(easy_process::Error::Io(io_err)) => panic!("unexpected I/O Error: {:?}", io_err),
+        Err(easy_process::Error::Failure(ex, output)) => {
+            output_code = ex.code().unwrap();
+            output_stdout = output.stdout.as_bytes().to_vec();
+            output_stderr = output.stderr.as_bytes().to_vec();
+        }
+    }
+    assert_ne!(output_code, 0, "{}", readable_assertion("input_file_is_directory", "compile return code", 0.to_string(), output_code.to_string()));
+    assert_eq!(output_stdout, "".as_bytes().to_vec(), "{}", readable_assertion("input_file_is_directory", "compile stdout", "".as_bytes().to_vec().iter().map(|&x| x as char).collect::<String>(), output_stdout.iter().map(|&x| x as char).collect::<String>()));
+    assert_eq!(output_stderr, "ERROR input file `tests` not a file\n".as_bytes().to_vec(), "{}", readable_assertion("input_file_is_directory", "compile_stderr", "ERROR input file `tests` not a file\n".as_bytes().to_vec().iter().map(|&x| x as char).collect::<String>(), output_stderr.iter().map(|&x| x as char).collect::<String>()));
     Ok(())
 }
 

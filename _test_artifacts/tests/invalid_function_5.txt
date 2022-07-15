@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 92
+:b stderr 84
 def name ( -- ) {
 ^
-./tests/invalid_function_5.north:0:0: ERROR invalid function definition
+invalid_function_5.north:0:0: ERROR invalid function definition
 

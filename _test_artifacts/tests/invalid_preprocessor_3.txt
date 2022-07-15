@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 151
+:b stderr 143
 #include "invalid_preprocessor3.north"
          ^
-./tests/invalid_preprocessor_3.north:0:9: ERROR include file `invalid_preprocessor3.north` not found
+invalid_preprocessor_3.north:0:9: ERROR include file `invalid_preprocessor3.north` not found
 

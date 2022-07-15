@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 99
+:b stderr 91
 "bad string
 ^
-./tests/invalid_string_literal.north:0:0: ERROR invalid string literal `"bad string`
+invalid_string_literal.north:0:0: ERROR invalid string literal `"bad string`
 

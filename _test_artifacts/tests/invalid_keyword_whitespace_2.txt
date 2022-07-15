@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 162
+:b stderr 154
 5 drop "Hello World\n"1 1 syscall3 drop
        ^
-./tests/invalid_keyword_whitespace_2.north:0:7: ERROR tokens should be separated by whitespace `"Hello World\n"`
+invalid_keyword_whitespace_2.north:0:7: ERROR tokens should be separated by whitespace `"Hello World\n"`
 

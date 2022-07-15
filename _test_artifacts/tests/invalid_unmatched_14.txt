@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 94
+:b stderr 86
 break
 ^
-./tests/invalid_unmatched_14.north:29:0: ERROR `break` not valid outside `while` loop
+invalid_unmatched_14.north:29:0: ERROR `break` not valid outside `while` loop
 

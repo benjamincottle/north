@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 122
+:b stderr 114
 def 2 ( -- ) {
     ^
-./tests/invalid_function_2.north:0:4: ERROR invalid function name type `uint`, expected `identifier`
+invalid_function_2.north:0:4: ERROR invalid function name type `uint`, expected `identifier`
 

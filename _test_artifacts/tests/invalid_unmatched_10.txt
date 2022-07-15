@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 100
+:b stderr 92
 1 1 == do do
           ^
-./tests/invalid_unmatched_10.north:0:10: ERROR missing `while` before `do`
+invalid_unmatched_10.north:0:10: ERROR missing `while` before `do`
 

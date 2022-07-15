@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 156
+:b stderr 148
 #include "path/file.north"
          ^
-./tests/invalid_preprocessor_1.north:0:9: ERROR `#include` can not be a path. Additional search paths not implemented
+invalid_preprocessor_1.north:0:9: ERROR `#include` can not be a path. Additional search paths not implemented
 

@@ -4,8 +4,8 @@
 :i returncode 1
 :b stdout 0
 
-:b stderr 96
+:b stderr 88
 #include dup
          ^
-./tests/invalid_preprocessor_4.north:0:9: ERROR invalid `#include` file
+invalid_preprocessor_4.north:0:9: ERROR invalid `#include` file
 

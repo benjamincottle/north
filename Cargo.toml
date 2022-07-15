@@ -12,6 +12,4 @@ phf = { version = "0.10", features = ["macros"] }
 colored = "2"
 
 [dev-dependencies]
-predicates = "2.1.1"
-subprocess = "0.2.9"
-pretty_assertions = "1.2.1"
+easy_process = "0.2.1"

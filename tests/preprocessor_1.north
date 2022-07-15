@@ -1,3 +1,2 @@
 #include "arithmetic.north"
-; #include <std.north>
 632 print

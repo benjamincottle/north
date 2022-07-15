@@ -1,14 +1,18 @@
-:i argc 1
-:b arg0 20
-salt soymilk padlock
+:i argc 3
+:b arg0 6
+carrot
+:b arg1 8
+carriage
+:b arg2 5
+cards
 :b stdin 0
 
 :i returncode 0
-:b stdout 30
-./output
-salt
-soymilk
-padlock
+:b stdout 34
+./argc_argv
+carrot
+carriage
+cards
 
 :b stderr 0
 
