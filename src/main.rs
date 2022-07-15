@@ -30,14 +30,6 @@ struct Args {
     #[clap(short, value_parser, value_name = "OUTPUT_FILE", display_order = 4)]
     output_file: Option<String>,
 
-    /// Execute output on successful compilation
-    #[clap(short, action, display_order = 5)]
-    run_output: bool,
-
-    /// Optional command line arguments to pass to the execution. Quote multiple arguments or arguments containing spaces.
-    #[clap(short, value_parser, value_name = "EXEC_ARGS", display_order = 6)]
-    execute_args: Option<String>,
-
     /// Path to input file to compile
     #[clap(value_parser, value_name = "INPUT_FILE")]
     input_file: PathBuf,
@@ -1976,24 +1968,7 @@ fn main() {
         Some(f) => f,
         None => "".to_string(),
     };
-    let run_output = match args.run_output {
-        true => true,
-        false => false,
-    };
-    let execute_args = match args.execute_args {
-        Some(e) => e,
-        None => "".to_string(),
-    };
     let input_file = args.input_file;
-    let output_file = output_file;
-    if !run_output && execute_args != "" {
-        let mut cmd = Args::command();
-        cmd.error(
-            ErrorKind::MissingRequiredArgument,
-            "-r is required when using -e",
-        )
-        .exit();
-    }
     if assembler == Assembler::Fasm && generate_debug_symbols == true {
         let mut cmd = Args::command();
         cmd.error(ErrorKind::ArgumentConflict, "-g is not supported by fasm")
@@ -2064,10 +2039,4 @@ fn main() {
         cleanup_command.arg(asm_file);
     };
     run_cmd(cleanup_command, debug_level);
-    if run_output {
-        let mut run_command = Command::new("./".to_owned() + output_file.as_str());
-        run_command.args(execute_args.split(' '));
-        let exit_code = run_cmd(run_command, debug_level);
-        std::process::exit(exit_code);
-    };
 }
