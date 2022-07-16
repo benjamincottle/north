@@ -257,7 +257,10 @@ fn run_cmd(mut cmd: Command, debug_level: usize) -> i32 {
             };
         }
         _ => {
-            eprintln!("    [ {:?} {:?} ]", cmd.get_program(), cmd.get_args());
+            if cmd.get_program() == "fasm" {
+                cmd.stdout(Stdio::null());
+            };
+            eprintln!("[ {} {} ]", cmd.get_program().to_str().unwrap(), cmd.get_args().into_iter().map(|s|s.to_str().unwrap()).collect::<Vec<_>>().join(" "));
         }
     };
     let status = cmd
@@ -1112,7 +1115,10 @@ fn locate_blocks(
         std::process::exit(1);
     };
     if debug_level > 2 {
-        println!("locate_blocks(): \n{:?}\n", program);
+        println!("[ intermediate representation ]");
+        for op in program.clone() {
+            println!("  {:?}", op);
+        }
     };
     (program, function_defs, required_labels)
 }
@@ -1245,7 +1251,7 @@ fn parse_tokens(
             }
         };
     }
-    if debug_level > 2 {
+    if debug_level > 3 {
         println!("parse_tokens(): \n{:?}\n", program);
     };
 
@@ -1464,7 +1470,7 @@ fn preprocessor_function(
         }
     }
     tokens_expanded.extend(function_tokens);
-    if debug_level > 2 {
+    if debug_level > 3 {
         println!("preprocessor_function(): \n{:?}\n", tokens_expanded);
     }
 
@@ -1545,7 +1551,7 @@ fn preprocessor_define(
             }
         }
     }
-    if debug_level > 2 {
+    if debug_level > 3 {
         println!("preprocessor_define(): \n{:?}\n", tokens_expanded.clone());
     }
     tokens_expanded
@@ -1676,7 +1682,7 @@ fn preprocessor_include(
             tokens_expanded.push(token);
         }
     }
-    if debug_level > 2 {
+    if debug_level > 3 {
         println!("preprocessor_include(): \n{:?}\n", tokens_expanded.clone());
     }
 
@@ -1943,7 +1949,7 @@ fn load_tokens(
         .iter()
         .flat_map(|(line_number, line)| parse_line(&path, *line_number, line).unwrap())
         .collect::<Vec<_>>();
-    if debug_level > 2 {
+    if debug_level > 3 {
         println!("load_tokens(): \n{:?}\n", tokens.clone());
     }
     if tokens.len() == 0 {
