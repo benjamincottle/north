@@ -10,6 +10,12 @@ clap = { version = "3.2.8", features = ["derive"] }
 hex = "0.4.3"
 phf = { version = "0.10", features = ["macros"] }
 colored = "2"
+easy_process = "0.2.1"
 
 [dev-dependencies]
 easy_process = "0.2.1"
+
+[[bin]]
+name = "cargo-case"
+test = false
+bench = false
