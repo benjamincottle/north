@@ -215,7 +215,7 @@ struct Define {
     tokens: Vec<((PathBuf, usize, usize), (TokenType, String))>,
 }
 
-fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str) {
+fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str) -> std::io::Result<()> {
     let input_file = File::open(token_loc.0.clone()).expect("failed to open input file");
     let input_line = BufReader::new(input_file)
         .lines()
@@ -247,9 +247,10 @@ fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str
         token_loc.2,
         escaped_error_message
     );
+    Ok(())
 }
 
-fn run_cmd(mut cmd: Command, debug_level: usize) -> i32 {
+fn run_cmd(mut cmd: Command, debug_level: usize) -> std::io::Result<i32> {
     match debug_level {
         0 => {
             if cmd.get_program() == "fasm" {
@@ -266,7 +267,7 @@ fn run_cmd(mut cmd: Command, debug_level: usize) -> i32 {
     let status = cmd
         .status()
         .expect(format!("ERROR command `{:?}` failed to start", cmd.get_program()).as_str());
-    status.code().unwrap()
+    Ok(status.code().unwrap())
 }
 
 fn compile_to_elf64_asm(
@@ -279,629 +280,632 @@ fn compile_to_elf64_asm(
     asm_file: PathBuf,
     assembler: Assembler,
     debug_level: usize,
-) {
+) -> std::io::Result<()> {
     let mut str_data: Vec<String> = Vec::new();
     let mut implicit_exit_req: bool = true;
-    let mut asm = File::create(asm_file).unwrap();
-    match assembler {
-        Assembler::Nasm => {
-            write!(asm, "BITS 64\n").unwrap();
-            write!(asm, "section .text\n").unwrap();
+    {
+        let mut asm = File::create(asm_file)?;
+        match assembler {
+            Assembler::Nasm => {
+                write!(asm, "BITS 64\n")?;
+                write!(asm, "section .text\n")?;
+            }
+            Assembler::Fasm => {
+                write!(asm, "format ELF64\n")?;
+                write!(asm, "section '.text' executable\n")?;
+            }
+        };
+        write!(asm, "print:\n")?;
+        write!(asm, "    sub     rsp, 0x28\n")?;
+        write!(asm, "    mov     r9, 0xcccccccccccccccd\n")?;
+        write!(asm, "    mov     BYTE [rsp+0x1f], 0xa\n")?;
+        write!(asm, "    lea     rcx, [rsp+0x1e]\n")?;
+        write!(asm, ".L00:\n")?;
+        write!(asm, "    mov     rax, rdi\n")?;
+        write!(asm, "    lea     r8, [rsp+0x20]\n")?;
+        write!(asm, "    mul     r9\n")?;
+        write!(asm, "    mov     rax, rdi\n")?;
+        write!(asm, "    sub     r8, rcx\n")?;
+        write!(asm, "    shr     rdx, 0x3\n")?;
+        write!(asm, "    lea     rsi, [rdx+rdx*0x4]\n")?;
+        write!(asm, "    add     rsi, rsi\n")?;
+        write!(asm, "    sub     rax, rsi\n")?;
+        write!(asm, "    add     eax, 0x30\n")?;
+        write!(asm, "    mov     BYTE [rcx], al\n")?;
+        write!(asm, "    mov     rax, rdi\n")?;
+        write!(asm, "    mov     rdi, rdx\n")?;
+        write!(asm, "    mov     rdx, rcx\n")?;
+        write!(asm, "    sub     rcx, 0x1\n")?;
+        write!(asm, "    cmp     rax, 0x9\n")?;
+        write!(asm, "    ja      .L00\n")?;
+        write!(asm, "    lea     rax, [rsp+0x20]\n")?;
+        write!(asm, "    mov     edi, 0x1\n")?;
+        write!(asm, "    sub     rdx, rax\n")?;
+        write!(asm, "    xor     eax, eax\n")?;
+        write!(asm, "    lea     rsi, [rsp+0x20+rdx]\n")?;
+        write!(asm, "    mov     rdx, r8\n")?;
+        write!(asm, "    mov     rax, 0x1\n")?;
+        write!(asm, "    syscall\n")?;
+        write!(asm, "    add     rsp, 0x28\n")?;
+        write!(asm, "    ret\n")?;
+        match assembler {
+            Assembler::Nasm => {
+                write!(asm, "global _start\n")?;
+            }
+            Assembler::Fasm => {
+                write!(asm, "public _start as '_start'\n")?;
+            }
+        };
+        write!(asm, "_start:\n")?;
+        write!(asm, "    mov     [argc_ptr], rsp\n")?;
+        for (index, program_op) in program.clone().iter().enumerate() {
+            let builtin_type = program_op.1 .1;
+            if required_labels.contains(&index) || debug_level > 1 {
+                write!(asm, ".L{}:\n", index)?;
+            }
+            if debug_level > 1 {
+                write!(asm, "    ;; -- {:?} --\n", builtin_type)?;
+            }
+            match builtin_type {
+                ProgramOp::PUSHINT => {
+                    write!(
+                        asm,
+                        "    mov     rax, {:#02x}\n",
+                        program_op.1 .2.clone().unwrap().parse::<u64>().unwrap()
+                    )
+                    ?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::PRINT => {
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    call    print\n")?;
+                }
+                ProgramOp::ADD => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    add     rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SUB => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    sub     rbx, rax\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::MUL => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    mul     rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::DIV => {
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    match program[index - 1].1 .2.clone().unwrap().parse::<f64>() {
+                        Ok(explicit_divisor) => {
+                            let opt_divisor: u64 = (2_f64.powf(64.0) / explicit_divisor) as u64;
+                            write!(asm, "    mov     rcx, {:#02x}\n", opt_divisor)?;
+                            write!(asm, "    mul     rcx\n")?;
+                            write!(asm, "    push    rdx\n")?;
+                        }
+                        Err(_) => {
+                            write!(asm, "    mov     rdx, 0x0\n")?;
+                            write!(asm, "    div     rbx\n")?;
+                            write!(asm, "    push    rax\n")?;
+                        }
+                    };
+                }
+                ProgramOp::MOD => {
+                    write!(asm, "    mov     rdx, 0x0\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    div     rbx\n")?;
+                    write!(asm, "    push    rdx\n")?;
+                }
+                ProgramOp::MEM => {
+                    write!(asm, "    push    mem\n")?;
+                }
+                ProgramOp::STORE8 => {
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    mov     [rax], bl\n")?;
+                }
+                ProgramOp::STORE16 => {
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    mov     [rax], bx\n")?;
+                }
+                ProgramOp::STORE32 => {
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    mov     [rax], ebx\n")?;
+                }
+                ProgramOp::STORE64 => {
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    mov     [rax], rbx\n")?;
+                }
+                ProgramOp::LOAD8 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    xor     rbx, rbx\n")?;
+                    write!(asm, "    mov     bl, [rax]\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::LOAD16 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    xor     rbx, rbx\n")?;
+                    write!(asm, "    mov     bx, [rax]\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::LOAD32 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    xor     rbx, rbx\n")?;
+                    write!(asm, "    mov     ebx, [rax]\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::LOAD64 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    xor     rbx, rbx\n")?;
+                    write!(asm, "    mov     rbx, [rax]\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::EXIT => {
+                    write!(asm, "    mov     eax, 0xe7\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    syscall\n")?;
+                }
+                ProgramOp::DUP => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::TWODUP => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::DROP => {
+                    write!(asm, "    pop     rax\n")?;
+                }
+                ProgramOp::TWODROP => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                }
+                ProgramOp::OVER => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::TWOOVER => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rcx\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    push    rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::SWAP => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                }
+                ProgramOp::TWOSWAP => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rcx\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::ROT => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    pop     rcx\n")?;
+                    write!(asm, "    push    rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::DUPNZ => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, "    cmp     rax, 0\n")?;
+                    write!(asm, "    je      .L{}a\n", index)?;
+                    write!(asm, "    push    rax\n")?;
+                    write!(asm, ".L{}a:\n", index)?;
+                }
+                ProgramOp::MAX => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovge  rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::MIN => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovle  rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::EQUAL => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmove   rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::NOTEQUAL => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovne  rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::GT => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovg   rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::GE => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovge  rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::LT => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovl   rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::LE => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    cmp     rbx, rax\n")?;
+                    write!(asm, "    cmovle  rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::LOGICALAND => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    mul     rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::LOGICALOR => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    add     rax, rbx\n")?;
+                    write!(asm, "    cmp     rax, 0x0\n")?;
+                    write!(asm, "    cmovne  rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::LOGICALNOT => {
+                    write!(asm, "    mov     rcx, 0x0\n")?;
+                    write!(asm, "    mov     rdx, 0x1\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    cmp     rax, 0x0\n")?;
+                    write!(asm, "    cmove  rcx, rdx\n")?;
+                    write!(asm, "    push    rcx\n")?;
+                }
+                ProgramOp::LSHIFT => {
+                    write!(asm, "    pop     rcx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    shl     rax, cl\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::RSHIFT => {
+                    write!(asm, "    pop     rcx\n")?;
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    shr     rax, cl\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::BITWISEAND => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    and     rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::BITWISEOR => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    or     rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::BITWISENOT => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    not     rax\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::XOR => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rbx\n")?;
+                    write!(asm, "    xor     rax, rbx\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::WHILE => {}
+                ProgramOp::DO => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    cmp     rax, 0x0\n")?;
+                    write!(asm, "    je      .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::DONE => {
+                    write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::BREAK => {
+                    write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::CONTINUE => {
+                    write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::IF => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    cmp     rax, 0x0\n")?;
+                    write!(asm, "    je      .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::ELSE => {
+                    write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap())?;
+                }
+                ProgramOp::ENDIF => {}
+                ProgramOp::SYSCALL0 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL1 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL2 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    pop     rsi\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL3 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    pop     rsi\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL4 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    pop     rsi\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    pop     r10\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL5 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    pop     rsi\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    pop     r10\n")?;
+                    write!(asm, "    pop     r8\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::SYSCALL6 => {
+                    write!(asm, "    pop     rax\n")?;
+                    write!(asm, "    pop     rdi\n")?;
+                    write!(asm, "    pop     rsi\n")?;
+                    write!(asm, "    pop     rdx\n")?;
+                    write!(asm, "    pop     r10\n")?;
+                    write!(asm, "    pop     r8\n")?;
+                    write!(asm, "    pop     r9\n")?;
+                    write!(asm, "    syscall\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::PUSHSTR => {
+                    if !str_data.contains(&program_op.1 .2.clone().unwrap()) {
+                        str_data.push(program_op.1 .2.clone().unwrap());
+                    };
+                    let str_len = program_op.1 .2.clone().unwrap().len();
+                    write!(asm, "    push    {:#04x}\n", (str_len))?;
+                    let str_index = str_data
+                        .iter()
+                        .position(|r| r == &program_op.1 .2.clone().unwrap())
+                        .unwrap();
+                    write!(asm, "    push    str{}\n", str_index)?;
+                }
+                ProgramOp::ARGC => {
+                    write!(asm, "    mov     rax, [argc_ptr]\n")?;
+                    write!(asm, "    mov     rax, [rax]\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::ARGV => {
+                    write!(asm, "    mov     rax, [argc_ptr]\n")?;
+                    write!(asm, "    add     rax, 0x8\n")?;
+                    write!(asm, "    push    rax\n")?;
+                }
+                ProgramOp::RETURN => {
+                    let function = function_defs
+                        .get(&program_op.1 .2.clone().unwrap())
+                        .unwrap();
+                    let returns_count = function.2.len();
+                    if returns_count > 0 {
+                        write!(asm, "    pop     rax\n")?;
+                    };
+                    write!(asm, "    pop     rbp\n")?;
+                    write!(asm, "    ret\n")?;
+                }
+                ProgramOp::FUNCCALL => {
+                    let function = function_defs
+                        .get(&program_op.1 .2.clone().unwrap())
+                        .unwrap();
+                    let function_name = function.0.clone();
+                    let args_count = function.1.len();
+                    let returns_count = function.2.len();
+                    if args_count > 0 {
+                        write!(asm, "    pop     rdi\n")?;
+                    };
+                    if args_count > 1 {
+                        write!(asm, "    pop     rsi\n")?;
+                    };
+                    if args_count > 2 {
+                        write!(asm, "    pop     rdx\n")?;
+                    };
+                    if args_count > 3 {
+                        write!(asm, "    pop     rcx\n")?;
+                    };
+                    if args_count > 4 {
+                        write!(asm, "    pop     r8\n")?;
+                    };
+                    if args_count > 5 {
+                        write!(asm, "    pop     r9\n")?;
+                    };
+                    if args_count > 6 {
+                        print_compilation_message(
+                            program_op.0.clone(),
+                            "Too many arguments to function",
+                        ).unwrap();
+                        std::process::exit(1);
+                    };
+                    write!(asm, "    call    {}\n", function_name)?;
+                    if returns_count > 0 {
+                        write!(asm, "    push    rax\n")?;
+                    };
+                }
+                ProgramOp::FUNCRET => {
+                    let function = function_defs
+                        .get(&program_op.1 .2.clone().unwrap())
+                        .unwrap();
+                    let returns_count = function.2.len();
+                    if returns_count > 0 {
+                        write!(asm, "    pop     rax\n")?;
+                    };
+                    write!(asm, "    pop     rbp\n")?;
+                    write!(asm, "    ret\n")?;
+                }
+                ProgramOp::FUNCDEF => {
+                    let function = function_defs
+                        .get(&program_op.1 .2.clone().unwrap())
+                        .unwrap();
+                    let function_name = function.0.clone();
+                    let args_count = function.1.len();
+                    if implicit_exit_req {
+                        write!(asm, ".L{}:\n", program.len())?;
+                        write!(asm, "    mov     eax, 0xe7\n")?;
+                        write!(asm, "    mov     rdi, 0x0\n")?;
+                        write!(asm, "    syscall\n")?;
+                        implicit_exit_req = false;
+                    };
+                    write!(asm, "{}:\n", function_name)?;
+                    write!(asm, "    push    rbp\n")?;
+                    write!(asm, "    mov     rbp, rsp\n")?;
+                    if args_count > 6 {
+                        print_compilation_message(
+                            program_op.0.clone(),
+                            "Too many arguments to function",
+                        ).unwrap();
+                        std::process::exit(1);
+                    };
+                    if args_count > 5 {
+                        write!(asm, "    push    r9\n")?;
+                    };
+                    if args_count > 4 {
+                        write!(asm, "    push    r8\n")?;
+                    };
+                    if args_count > 3 {
+                        write!(asm, "    push    rcx\n")?;
+                    };
+                    if args_count > 2 {
+                        write!(asm, "    push    rdx\n")?;
+                    };
+                    if args_count > 1 {
+                        write!(asm, "    push    rsi\n")?;
+                    };
+                    if args_count > 0 {
+                        write!(asm, "    push    rdi\n")?;
+                    };
+                }
+                ProgramOp::DEF => {}
+                ProgramOp::INCLUDE => {}
+                ProgramOp::DEFINE => {}
+            };
         }
-        Assembler::Fasm => {
-            write!(asm, "format ELF64\n").unwrap();
-            write!(asm, "section '.text' executable\n").unwrap();
-        }
-    };
-    write!(asm, "print:\n").unwrap();
-    write!(asm, "    sub     rsp, 0x28\n").unwrap();
-    write!(asm, "    mov     r9, 0xcccccccccccccccd\n").unwrap();
-    write!(asm, "    mov     BYTE [rsp+0x1f], 0xa\n").unwrap();
-    write!(asm, "    lea     rcx, [rsp+0x1e]\n").unwrap();
-    write!(asm, ".L00:\n").unwrap();
-    write!(asm, "    mov     rax, rdi\n").unwrap();
-    write!(asm, "    lea     r8, [rsp+0x20]\n").unwrap();
-    write!(asm, "    mul     r9\n").unwrap();
-    write!(asm, "    mov     rax, rdi\n").unwrap();
-    write!(asm, "    sub     r8, rcx\n").unwrap();
-    write!(asm, "    shr     rdx, 0x3\n").unwrap();
-    write!(asm, "    lea     rsi, [rdx+rdx*0x4]\n").unwrap();
-    write!(asm, "    add     rsi, rsi\n").unwrap();
-    write!(asm, "    sub     rax, rsi\n").unwrap();
-    write!(asm, "    add     eax, 0x30\n").unwrap();
-    write!(asm, "    mov     BYTE [rcx], al\n").unwrap();
-    write!(asm, "    mov     rax, rdi\n").unwrap();
-    write!(asm, "    mov     rdi, rdx\n").unwrap();
-    write!(asm, "    mov     rdx, rcx\n").unwrap();
-    write!(asm, "    sub     rcx, 0x1\n").unwrap();
-    write!(asm, "    cmp     rax, 0x9\n").unwrap();
-    write!(asm, "    ja      .L00\n").unwrap();
-    write!(asm, "    lea     rax, [rsp+0x20]\n").unwrap();
-    write!(asm, "    mov     edi, 0x1\n").unwrap();
-    write!(asm, "    sub     rdx, rax\n").unwrap();
-    write!(asm, "    xor     eax, eax\n").unwrap();
-    write!(asm, "    lea     rsi, [rsp+0x20+rdx]\n").unwrap();
-    write!(asm, "    mov     rdx, r8\n").unwrap();
-    write!(asm, "    mov     rax, 0x1\n").unwrap();
-    write!(asm, "    syscall\n").unwrap();
-    write!(asm, "    add     rsp, 0x28\n").unwrap();
-    write!(asm, "    ret\n").unwrap();
-    match assembler {
-        Assembler::Nasm => {
-            write!(asm, "global _start\n").unwrap();
-        }
-        Assembler::Fasm => {
-            write!(asm, "public _start as '_start'\n").unwrap();
-        }
-    };
-    write!(asm, "_start:\n").unwrap();
-    write!(asm, "    mov     [argc_ptr], rsp\n").unwrap();
-    for (index, program_op) in program.clone().iter().enumerate() {
-        let builtin_type = program_op.1 .1;
-        if required_labels.contains(&index) || debug_level > 1 {
-            write!(asm, ".L{}:\n", index).unwrap();
-        }
-        if debug_level > 1 {
-            write!(asm, "    ;; -- {:?} --\n", builtin_type).unwrap();
-        }
-        match builtin_type {
-            ProgramOp::PUSHINT => {
-                write!(
-                    asm,
-                    "    mov     rax, {:#02x}\n",
-                    program_op.1 .2.clone().unwrap().parse::<u64>().unwrap()
-                )
-                .unwrap();
-                write!(asm, "    push    rax\n").unwrap();
+        match implicit_exit_req {
+            true => {
+                write!(asm, ".L{}:\n", program.len())?;
+                write!(asm, "    mov     eax, 0xe7\n")?;
+                write!(asm, "    mov     rdi, 0x0\n")?;
+                write!(asm, "    syscall\n")?;
+            }
+            false => {}
+        };
+        match assembler {
+            Assembler::Nasm => {
+                write!(asm, "section .data\n")?;
+            }
+            Assembler::Fasm => {
+                write!(asm, "section '.data' writable\n")?;
+            }
+        };
+        if str_data.len() > 0 {
+            for (str_index, static_str) in str_data.iter().enumerate() {
+                let str_label = format!("str{}", str_index);
+                let mut hex_str = String::new();
+                for byte in static_str.bytes() {
+                    hex_str.push_str(&format!("0x{:02x},", byte));
+                }
+                hex_str.pop();
+                if hex_str.len() > 0 {
+                    hex_str.extend(",0x00".chars());
+                } else {
+                    hex_str.extend("0x00".chars());
+                }
+                write!(asm, "    {}: db {}\n", str_label, hex_str)?;
+            }
+        };
+        match assembler {
+            Assembler::Nasm => {
+                write!(asm, "section .bss\n")?;
+                write!(asm, "    argc_ptr: resq 0x1\n")?;
+                write!(asm, "    mem: resb {}\n", MEMORY_SIZE)?;
+            }
+            Assembler::Fasm => {
+                write!(asm, "    argc_ptr: rq 0x1\n")?;
+                write!(asm, "    mem: rb {}\n", MEMORY_SIZE)?;
             }
-            ProgramOp::PRINT => {
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    call    print\n").unwrap();
-            }
-            ProgramOp::ADD => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    add     rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SUB => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    sub     rbx, rax\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::MUL => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    mul     rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::DIV => {
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                match program[index - 1].1 .2.clone().unwrap().parse::<f64>() {
-                    Ok(explicit_divisor) => {
-                        let opt_divisor: u64 = (2_f64.powf(64.0) / explicit_divisor) as u64;
-                        write!(asm, "    mov     rcx, {:#02x}\n", opt_divisor).unwrap();
-                        write!(asm, "    mul     rcx\n").unwrap();
-                        write!(asm, "    push    rdx\n").unwrap();
-                    }
-                    Err(_) => {
-                        write!(asm, "    mov     rdx, 0x0\n").unwrap();
-                        write!(asm, "    div     rbx\n").unwrap();
-                        write!(asm, "    push    rax\n").unwrap();
-                    }
-                };
-            }
-            ProgramOp::MOD => {
-                write!(asm, "    mov     rdx, 0x0\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    div     rbx\n").unwrap();
-                write!(asm, "    push    rdx\n").unwrap();
-            }
-            ProgramOp::MEM => {
-                write!(asm, "    push    mem\n").unwrap();
-            }
-            ProgramOp::STORE8 => {
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    mov     [rax], bl\n").unwrap();
-            }
-            ProgramOp::STORE16 => {
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    mov     [rax], bx\n").unwrap();
-            }
-            ProgramOp::STORE32 => {
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    mov     [rax], ebx\n").unwrap();
-            }
-            ProgramOp::STORE64 => {
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    mov     [rax], rbx\n").unwrap();
-            }
-            ProgramOp::LOAD8 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    xor     rbx, rbx\n").unwrap();
-                write!(asm, "    mov     bl, [rax]\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::LOAD16 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    xor     rbx, rbx\n").unwrap();
-                write!(asm, "    mov     bx, [rax]\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::LOAD32 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    xor     rbx, rbx\n").unwrap();
-                write!(asm, "    mov     ebx, [rax]\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::LOAD64 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    xor     rbx, rbx\n").unwrap();
-                write!(asm, "    mov     rbx, [rax]\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::EXIT => {
-                write!(asm, "    mov     eax, 0xe7\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-            }
-            ProgramOp::DUP => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::TWODUP => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::DROP => {
-                write!(asm, "    pop     rax\n").unwrap();
-            }
-            ProgramOp::TWODROP => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-            }
-            ProgramOp::OVER => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::TWOOVER => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rcx\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    push    rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::SWAP => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-            }
-            ProgramOp::TWOSWAP => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rcx\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::ROT => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    pop     rcx\n").unwrap();
-                write!(asm, "    push    rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::DUPNZ => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, "    cmp     rax, 0\n").unwrap();
-                write!(asm, "    je      .L{}a\n", index).unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-                write!(asm, ".L{}a:\n", index).unwrap();
-            }
-            ProgramOp::MAX => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovge  rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::MIN => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovle  rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::EQUAL => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmove   rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::NOTEQUAL => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovne  rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::GT => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovg   rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::GE => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovge  rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::LT => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovl   rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::LE => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    cmp     rbx, rax\n").unwrap();
-                write!(asm, "    cmovle  rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::LOGICALAND => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    mul     rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::LOGICALOR => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    add     rax, rbx\n").unwrap();
-                write!(asm, "    cmp     rax, 0x0\n").unwrap();
-                write!(asm, "    cmovne  rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::LOGICALNOT => {
-                write!(asm, "    mov     rcx, 0x0\n").unwrap();
-                write!(asm, "    mov     rdx, 0x1\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    cmp     rax, 0x0\n").unwrap();
-                write!(asm, "    cmove  rcx, rdx\n").unwrap();
-                write!(asm, "    push    rcx\n").unwrap();
-            }
-            ProgramOp::LSHIFT => {
-                write!(asm, "    pop     rcx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    shl     rax, cl\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::RSHIFT => {
-                write!(asm, "    pop     rcx\n").unwrap();
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    shr     rax, cl\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::BITWISEAND => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    and     rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::BITWISEOR => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    or     rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::BITWISENOT => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    not     rax\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::XOR => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rbx\n").unwrap();
-                write!(asm, "    xor     rax, rbx\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::WHILE => {}
-            ProgramOp::DO => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    cmp     rax, 0x0\n").unwrap();
-                write!(asm, "    je      .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::DONE => {
-                write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::BREAK => {
-                write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::CONTINUE => {
-                write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::IF => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    cmp     rax, 0x0\n").unwrap();
-                write!(asm, "    je      .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::ELSE => {
-                write!(asm, "    jmp     .L{}\n", program_op.1 .2.clone().unwrap()).unwrap();
-            }
-            ProgramOp::ENDIF => {}
-            ProgramOp::SYSCALL0 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL1 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL2 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    pop     rsi\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL3 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    pop     rsi\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL4 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    pop     rsi\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    pop     r10\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL5 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    pop     rsi\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    pop     r10\n").unwrap();
-                write!(asm, "    pop     r8\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::SYSCALL6 => {
-                write!(asm, "    pop     rax\n").unwrap();
-                write!(asm, "    pop     rdi\n").unwrap();
-                write!(asm, "    pop     rsi\n").unwrap();
-                write!(asm, "    pop     rdx\n").unwrap();
-                write!(asm, "    pop     r10\n").unwrap();
-                write!(asm, "    pop     r8\n").unwrap();
-                write!(asm, "    pop     r9\n").unwrap();
-                write!(asm, "    syscall\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::PUSHSTR => {
-                if !str_data.contains(&program_op.1 .2.clone().unwrap()) {
-                    str_data.push(program_op.1 .2.clone().unwrap());
-                };
-                let str_len = program_op.1 .2.clone().unwrap().len();
-                write!(asm, "    push    {:#04x}\n", (str_len)).unwrap();
-                let str_index = str_data
-                    .iter()
-                    .position(|r| r == &program_op.1 .2.clone().unwrap())
-                    .unwrap();
-                write!(asm, "    push    str{}\n", str_index).unwrap();
-            }
-            ProgramOp::ARGC => {
-                write!(asm, "    mov     rax, [argc_ptr]\n").unwrap();
-                write!(asm, "    mov     rax, [rax]\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::ARGV => {
-                write!(asm, "    mov     rax, [argc_ptr]\n").unwrap();
-                write!(asm, "    add     rax, 0x8\n").unwrap();
-                write!(asm, "    push    rax\n").unwrap();
-            }
-            ProgramOp::RETURN => {
-                let function = function_defs
-                    .get(&program_op.1 .2.clone().unwrap())
-                    .unwrap();
-                let returns_count = function.2.len();
-                if returns_count > 0 {
-                    write!(asm, "    pop     rax\n").unwrap();
-                };
-                write!(asm, "    pop     rbp\n").unwrap();
-                write!(asm, "    ret\n").unwrap();
-            }
-            ProgramOp::FUNCCALL => {
-                let function = function_defs
-                    .get(&program_op.1 .2.clone().unwrap())
-                    .unwrap();
-                let function_name = function.0.clone();
-                let args_count = function.1.len();
-                let returns_count = function.2.len();
-                if args_count > 0 {
-                    write!(asm, "    pop     rdi\n").unwrap();
-                };
-                if args_count > 1 {
-                    write!(asm, "    pop     rsi\n").unwrap();
-                };
-                if args_count > 2 {
-                    write!(asm, "    pop     rdx\n").unwrap();
-                };
-                if args_count > 3 {
-                    write!(asm, "    pop     rcx\n").unwrap();
-                };
-                if args_count > 4 {
-                    write!(asm, "    pop     r8\n").unwrap();
-                };
-                if args_count > 5 {
-                    write!(asm, "    pop     r9\n").unwrap();
-                };
-                if args_count > 6 {
-                    print_compilation_message(
-                        program_op.0.clone(),
-                        "Too many arguments to function",
-                    );
-                    std::process::exit(1);
-                };
-                write!(asm, "    call    {}\n", function_name).unwrap();
-                if returns_count > 0 {
-                    write!(asm, "    push    rax\n").unwrap();
-                };
-            }
-            ProgramOp::FUNCRET => {
-                let function = function_defs
-                    .get(&program_op.1 .2.clone().unwrap())
-                    .unwrap();
-                let returns_count = function.2.len();
-                if returns_count > 0 {
-                    write!(asm, "    pop     rax\n").unwrap();
-                };
-                write!(asm, "    pop     rbp\n").unwrap();
-                write!(asm, "    ret\n").unwrap();
-            }
-            ProgramOp::FUNCDEF => {
-                let function = function_defs
-                    .get(&program_op.1 .2.clone().unwrap())
-                    .unwrap();
-                let function_name = function.0.clone();
-                let args_count = function.1.len();
-                if implicit_exit_req {
-                    write!(asm, ".L{}:\n", program.len()).unwrap();
-                    write!(asm, "    mov     eax, 0xe7\n").unwrap();
-                    write!(asm, "    mov     rdi, 0x0\n").unwrap();
-                    write!(asm, "    syscall\n").unwrap();
-                    implicit_exit_req = false;
-                };
-                write!(asm, "{}:\n", function_name).unwrap();
-                write!(asm, "    push    rbp\n").unwrap();
-                write!(asm, "    mov     rbp, rsp\n").unwrap();
-                if args_count > 6 {
-                    print_compilation_message(
-                        program_op.0.clone(),
-                        "Too many arguments to function",
-                    );
-                    std::process::exit(1);
-                };
-                if args_count > 5 {
-                    write!(asm, "    push    r9\n").unwrap();
-                };
-                if args_count > 4 {
-                    write!(asm, "    push    r8\n").unwrap();
-                };
-                if args_count > 3 {
-                    write!(asm, "    push    rcx\n").unwrap();
-                };
-                if args_count > 2 {
-                    write!(asm, "    push    rdx\n").unwrap();
-                };
-                if args_count > 1 {
-                    write!(asm, "    push    rsi\n").unwrap();
-                };
-                if args_count > 0 {
-                    write!(asm, "    push    rdi\n").unwrap();
-                };
-            }
-            ProgramOp::DEF => {}
-            ProgramOp::INCLUDE => {}
-            ProgramOp::DEFINE => {}
         };
     }
-    match implicit_exit_req {
-        true => {
-            write!(asm, ".L{}:\n", program.len()).unwrap();
-            write!(asm, "    mov     eax, 0xe7\n").unwrap();
-            write!(asm, "    mov     rdi, 0x0\n").unwrap();
-            write!(asm, "    syscall\n").unwrap();
-        }
-        false => {}
-    };
-    match assembler {
-        Assembler::Nasm => {
-            write!(asm, "section .data\n").unwrap();
-        }
-        Assembler::Fasm => {
-            write!(asm, "section '.data' writable\n").unwrap();
-        }
-    };
-    if str_data.len() > 0 {
-        for (str_index, static_str) in str_data.iter().enumerate() {
-            let str_label = format!("str{}", str_index);
-            let mut hex_str = String::new();
-            for byte in static_str.bytes() {
-                hex_str.push_str(&format!("0x{:02x},", byte));
-            }
-            hex_str.pop();
-            if hex_str.len() > 0 {
-                hex_str.extend(",0x00".chars());
-            } else {
-                hex_str.extend("0x00".chars());
-            }
-            write!(asm, "    {}: db {}\n", str_label, hex_str).unwrap();
-        }
-    };
-    match assembler {
-        Assembler::Nasm => {
-            write!(asm, "section .bss\n").unwrap();
-            write!(asm, "    argc_ptr: resq 0x1\n").unwrap();
-            write!(asm, "    mem: resb {}\n", MEMORY_SIZE).unwrap();
-        }
-        Assembler::Fasm => {
-            write!(asm, "    argc_ptr: rq 0x1\n").unwrap();
-            write!(asm, "    mem: rb {}\n", MEMORY_SIZE).unwrap();
-        }
-    };
+    Ok(())
 }
 
 fn locate_blocks(
@@ -911,14 +915,14 @@ fn locate_blocks(
     )>,
     function_defs: HashMap<String, (String, Vec<String>, Vec<String>)>,
     debug_level: usize,
-) -> (
+) -> std::io::Result<(
     Vec<(
         (PathBuf, usize, usize),
         (TokenType, ProgramOp, Option<String>),
     )>,
     HashMap<String, (String, Vec<String>, Vec<String>)>,
     Vec<usize>,
-) {
+)> {
     let mut required_labels: Vec<usize> = Vec::new();
     let mut while_stack: Vec<(
         usize,
@@ -953,23 +957,24 @@ fn locate_blocks(
             ProgramOp::DONE => {
                 if while_stack.len() < 2 {
                     if while_stack.len() == 1
-                        && while_stack.last().unwrap().1 .1 .1 == ProgramOp::DO
+                        // && while_stack.last().unwrap().1 .1 .1 == ProgramOp::DO
+                        && while_stack.last().unwrap().1 .1 .1 == ProgramOp::DO                        
                     {
                         let error_message = "ERROR missing `while` before `do`";
                         let token_loc = program[while_stack.last().unwrap().0.clone()].0.clone();
-                        print_compilation_message(token_loc, error_message);
+                        print_compilation_message(token_loc, error_message)?;
                         std::process::exit(1);
                     } else if while_stack.len() == 1
                         && while_stack.last().unwrap().1 .1 .1 == ProgramOp::WHILE
                     {
                         let error_message = "ERROR missing `do` before `done`";
                         let token_loc = program[index].0.clone();
-                        print_compilation_message(token_loc, error_message);
+                        print_compilation_message(token_loc, error_message)?;
                         std::process::exit(1);
                     } else {
                         let error_message = "ERROR missing `while` and `do` before `done`";
                         let token_loc = program[index].0.clone();
-                        print_compilation_message(token_loc, error_message);
+                        print_compilation_message(token_loc, error_message)?;
                         std::process::exit(1);
                     };
                 };
@@ -989,7 +994,7 @@ fn locate_blocks(
                                 print_compilation_message(
                                     program[while_stack.last().unwrap().0.clone()].0.clone(),
                                     "ERROR missing `while` before `do`",
-                                );
+                                )?;
                                 std::process::exit(1);
                             };
                             do_loc = while_stack.pop().unwrap().0;
@@ -1045,7 +1050,7 @@ fn locate_blocks(
                     print_compilation_message(
                         program[index].0.clone(),
                         "ERROR missing `if` before `else`",
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 let if_loc = if_stack.pop().unwrap().0;
@@ -1065,7 +1070,7 @@ fn locate_blocks(
                     print_compilation_message(
                         program[index].0.clone(),
                         "ERROR missing `if` before `endif`",
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 let if_or_else_loc = if_stack.pop().unwrap().0;
@@ -1098,7 +1103,7 @@ fn locate_blocks(
             // TODO something about the token should appear in the mesage
             "ERROR unmatched token"
         };
-        print_compilation_message(unmatched_token.0.clone(), error_message);
+        print_compilation_message(unmatched_token.0.clone(), error_message)?;
         std::process::exit(1);
     };
     if if_stack.len() != 0 {
@@ -1111,7 +1116,7 @@ fn locate_blocks(
             // TODO something about the token should appear in the mesage
             "ERROR unmatched token"
         };
-        print_compilation_message(unmatched_token.0.clone(), error_message);
+        print_compilation_message(unmatched_token.0.clone(), error_message)?;
         std::process::exit(1);
     };
     if debug_level > 2 {
@@ -1120,20 +1125,20 @@ fn locate_blocks(
             println!("  {:?}", op);
         }
     };
-    (program, function_defs, required_labels)
+    Ok((program, function_defs, required_labels))
 }
 
 fn parse_tokens(
     tokens: Vec<((PathBuf, usize, usize), (TokenType, String, Option<String>))>,
     function_defs: HashMap<String, (String, Vec<String>, Vec<String>)>,
     debug_level: usize,
-) -> (
+) -> std::io::Result<(
     Vec<(
         (PathBuf, usize, usize),
         (TokenType, ProgramOp, Option<String>),
     )>,
     HashMap<String, (String, Vec<String>, Vec<String>)>,
-) {
+)> {
     let mut program: Vec<(
         (PathBuf, usize, usize),
         (TokenType, ProgramOp, Option<String>),
@@ -1219,7 +1224,7 @@ fn parse_tokens(
                     print_compilation_message(
                         token.0.clone(),
                         format!("ERROR invalid token `{}`", token.1 .1.clone()).as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
             }
@@ -1255,16 +1260,16 @@ fn parse_tokens(
         println!("parse_tokens(): \n{:?}\n", program);
     };
 
-    (program, function_defs)
+    Ok((program, function_defs))
 }
 
 fn preprocessor_function(
     mut tokens: Vec<((PathBuf, usize, usize), (TokenType, String))>,
     debug_level: usize,
-) -> (
+) -> std::io::Result<(
     Vec<((PathBuf, usize, usize), (TokenType, String, Option<String>))>,
     HashMap<String, (String, Vec<String>, Vec<String>)>,
-) {
+)> {
     let mut function_defs = HashMap::new();
     let mut function_tokens: Vec<((PathBuf, usize, usize), (TokenType, String, Option<String>))> =
         Vec::new();
@@ -1278,7 +1283,7 @@ fn preprocessor_function(
                 print_compilation_message(
                     token.0.clone(),
                     "ERROR invalid function definition, expected function name",
-                );
+                )?;
                 std::process::exit(1);
             };
             if tokens[0].1 .0 != TokenType::Identifier {
@@ -1289,29 +1294,29 @@ fn preprocessor_function(
                         tokens[0].1 .0.to_string()
                     ))
                     .as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             if function_defs.contains_key(&tokens[0].1 .1) {
                 print_compilation_message(
                     tokens[0].0.clone(),
                     (format!("ERROR duplicate function name `{}`", tokens[0].1 .1)).as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             if tokens.len() < 3 {
-                print_compilation_message(token.0.clone(), "ERROR invalid function definition");
+                print_compilation_message(token.0.clone(), "ERROR invalid function definition")?;
                 std::process::exit(1);
             };
             if tokens[1].1 .1 != "(" {
                 print_compilation_message(
                     tokens[1].0.clone(),
                     (format!("ERROR invalid function argument definiton, expected `(`")).as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             if tokens.len() < 8 {
-                print_compilation_message(token.0.clone(), "ERROR invalid function definition");
+                print_compilation_message(token.0.clone(), "ERROR invalid function definition")?;
                 std::process::exit(1);
             };
             let mut function_args: Vec<String> = Vec::new();
@@ -1347,7 +1352,7 @@ fn preprocessor_function(
                             "ERROR invalid function argument definiton, expected `--` before `)`"
                         ))
                         .as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 if tokens[0].1 .0 != TokenType::Identifier {
@@ -1358,7 +1363,7 @@ fn preprocessor_function(
                             tokens[0].1 .0.to_string()
                         ))
                         .as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 function_args.push(tokens.remove(0).1 .1.clone());
@@ -1372,7 +1377,7 @@ fn preprocessor_function(
                             "ERROR invalid function argument definiton, expected `)` before `{{`"
                         ))
                         .as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 if tokens[0].1 .0 != TokenType::Identifier {
@@ -1383,7 +1388,7 @@ fn preprocessor_function(
                             tokens[0].1 .0.to_string()
                         ))
                         .as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 function_returns.push(tokens.remove(0).1 .1.clone());
@@ -1393,7 +1398,7 @@ fn preprocessor_function(
                 print_compilation_message(
                     tokens[0].0.clone(),
                     (format!("ERROR invalid function definition, expected `{{`")).as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             let function_body_loc = tokens[0].0.clone();
@@ -1411,14 +1416,14 @@ fn preprocessor_function(
                     print_compilation_message(
                         function_body_loc,
                         "ERROR invalid function definition, unmatched `{`",
-                    );
+                    )?;
                     std::process::exit(1);
                 };
                 if tokens[0].1 .1 == "{" {
                     print_compilation_message(
                         tokens[0].0.clone(),
                         (format!("ERROR invalid function definition, `{{` unexpected")).as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 };
 
@@ -1463,7 +1468,7 @@ fn preprocessor_function(
                 print_compilation_message(
                     token.0.clone(),
                     format!("ERROR `return` not valid outside function body").as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             tokens_expanded.push((token.0, (token.1 .0, token.1 .1, None)));
@@ -1474,13 +1479,13 @@ fn preprocessor_function(
         println!("preprocessor_function(): \n{:?}\n", tokens_expanded);
     }
 
-    (tokens_expanded, function_defs)
+   Ok((tokens_expanded, function_defs))
 }
 
 fn preprocessor_define(
     mut tokens: Vec<((PathBuf, usize, usize), (TokenType, String))>,
     debug_level: usize,
-) -> Vec<((PathBuf, usize, usize), (TokenType, String))> {
+) -> std::io::Result<Vec<((PathBuf, usize, usize), (TokenType, String))>> {
     let mut tokens_expanded: Vec<((PathBuf, usize, usize), (TokenType, String))> = Vec::new();
     let mut defines: HashMap<String, Define> = HashMap::new();
     while tokens.len() > 0 {
@@ -1488,15 +1493,15 @@ fn preprocessor_define(
         let token_data = token.1 .1.clone();
         if token_data == "#define" {
             if tokens.len() < 1 {
-                print_compilation_message(token.0.clone(), "ERROR `#define` missing define name");
+                print_compilation_message(token.0.clone(), "ERROR `#define` missing define name")?;
                 std::process::exit(1);
             };
             if tokens[0].1 .0 != TokenType::Identifier {
-                print_compilation_message(tokens[0].0.clone(), "ERROR invalid `#define` name");
+                print_compilation_message(tokens[0].0.clone(), "ERROR invalid `#define` name")?;
                 std::process::exit(1);
             };
             if tokens.len() < 3 {
-                print_compilation_message(token.0.clone(), "ERROR `#define` missing define value");
+                print_compilation_message(token.0.clone(), "ERROR `#define` missing define value")?;
                 std::process::exit(1);
             };
             let define_name_loc = tokens[0].0.clone();
@@ -1515,7 +1520,7 @@ fn preprocessor_define(
                     print_compilation_message(
                         define_name_loc,
                         format!("ERROR `#define` redefinition of `{}`", define_name).as_str(),
-                    );
+                    )?;
                     std::process::exit(1);
                 }
                 _ => {
@@ -1554,16 +1559,16 @@ fn preprocessor_define(
     if debug_level > 3 {
         println!("preprocessor_define(): \n{:?}\n", tokens_expanded.clone());
     }
-    tokens_expanded
+    Ok(tokens_expanded)
 }
 
 fn preprocessor_include(
     mut tokens: Vec<((PathBuf, usize, usize), (TokenType, String))>,
     mut include_depth: Vec<PathBuf>,
     debug_level: usize,
-) -> Vec<((PathBuf, usize, usize), (TokenType, String))> {
+) -> std::io::Result<Vec<((PathBuf, usize, usize), (TokenType, String))>> {
     if include_depth.len() > MAX_INCLUDE_DEPTH.try_into().unwrap() {
-        print_compilation_message(tokens[0].clone().0, "ERROR `#include` nested too deeply");
+        print_compilation_message(tokens[0].clone().0, "ERROR `#include` nested too deeply")?;
         std::process::exit(1);
     };
     let mut tokens_expanded: Vec<((PathBuf, usize, usize), (TokenType, String))> = Vec::new();
@@ -1573,7 +1578,7 @@ fn preprocessor_include(
         let parent_file = token.0 .0.clone();
         if token_data == "#include" {
             if tokens.len() == 0 {
-                print_compilation_message(token.0.clone(), "ERROR `#include` missing include file");
+                print_compilation_message(token.0.clone(), "ERROR `#include` missing include file")?;
                 std::process::exit(1);
             };
             let next_token = tokens.remove(0);
@@ -1581,7 +1586,7 @@ fn preprocessor_include(
             if !((next_token_data.starts_with("<") && next_token_data.ends_with(">"))
                 || (next_token_data.starts_with("\"") && next_token_data.ends_with("\"")))
             {
-                print_compilation_message(next_token.0.clone(), "ERROR invalid `#include` file");
+                print_compilation_message(next_token.0.clone(), "ERROR invalid `#include` file")?;
                 std::process::exit(1);
             }
             if next_token_data // TODO: trim_start replacces with strip_prefix
@@ -1594,14 +1599,14 @@ fn preprocessor_include(
                 print_compilation_message(
                     next_token.0.clone(),
                     "ERROR `#include` circular dependency",
-                );
+                )?;
                 std::process::exit(1);
             };
             if next_token_data.contains("/") {
                 print_compilation_message(
                     next_token.0.clone(),
                     "ERROR `#include` can not be a path. Additional search paths not implemented",
-                );
+                )?;
                 std::process::exit(1);
             }
             let include_file = next_token_data;
@@ -1627,7 +1632,7 @@ fn preprocessor_include(
                 print_compilation_message(
                     next_token.0.clone(),
                     format!("ERROR invalid include `{}`", next_token_data).as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             if !include_file_path.exists() {
@@ -1642,7 +1647,7 @@ fn preprocessor_include(
                             .unwrap()
                     )
                     .as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             if !include_file_path.is_file() {
@@ -1653,7 +1658,7 @@ fn preprocessor_include(
                         include_file_path.to_str().unwrap()
                     )
                     .as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
 
@@ -1663,7 +1668,7 @@ fn preprocessor_include(
                         "INFO: ignoring `#include {}`, already included ",
                         include_file
                     );
-                    print_compilation_message(next_token.0.clone(), error_message.as_str());
+                    print_compilation_message(next_token.0.clone(), error_message.as_str())?;
                 };
             } else {
                 include_depth.push(PathBuf::from(include_file));
@@ -1671,7 +1676,7 @@ fn preprocessor_include(
                     load_tokens(&PathBuf::from(include_file_path), debug_level).unwrap();
 
                 let include_file_tokens =
-                    preprocessor_include(include_file_tokens, include_depth.clone(), debug_level);
+                    preprocessor_include(include_file_tokens, include_depth.clone(), debug_level).unwrap();
 
                 //add include_file_tokens to tokens_expanded
                 for include_file_token in include_file_tokens {
@@ -1686,7 +1691,7 @@ fn preprocessor_include(
         println!("preprocessor_include(): \n{:?}\n", tokens_expanded.clone());
     }
 
-    tokens_expanded
+    Ok(tokens_expanded)
 }
 
 fn parse_line(
@@ -1715,7 +1720,7 @@ fn parse_line(
                 print_compilation_message(
                     (path.clone(), line_num, col_num),
                     error_message.as_str(),
-                );
+                )?;
                 std::process::exit(1);
             };
             col_num = cur_column;
@@ -1763,7 +1768,7 @@ fn parse_line(
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
-                        );
+                        )?;
                         std::process::exit(1);
                     }
                     result.push(((path.clone(), line_num, col_num), (token_type, token)));
@@ -1824,7 +1829,7 @@ fn parse_line(
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
-                        );
+                        )?;
                         std::process::exit(1);
                     };
                     if line.len() > 0 && !line.starts_with(" ") {
@@ -1833,7 +1838,7 @@ fn parse_line(
                         print_compilation_message(
                             (path.clone(), line_num, col_num),
                             error_message.as_str(),
-                        );
+                        )?;
                         std::process::exit(1);
                     };
                     result.push(((path.clone(), line_num, col_num), (token_type, token)));
@@ -1894,12 +1899,12 @@ fn parse_line(
 
     if token.matches("\"").count() == 1 {
         let error_message = format!("ERROR invalid string literal `{}`", token);
-        print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
+        print_compilation_message((path.clone(), line_num, col_num), error_message.as_str())?;
         std::process::exit(1);
     };
     if token.matches("'").count() == 1 {
         let error_message = format!("ERROR invalid character literal `{}`", token);
-        print_compilation_message((path.clone(), line_num, col_num), error_message.as_str());
+        print_compilation_message((path.clone(), line_num, col_num), error_message.as_str())?;
         std::process::exit(1);
     };
     // push last token on the line
@@ -1925,7 +1930,7 @@ fn load_tokens(
         eprintln!("ERROR input file `{}` not found", path.as_path().file_name().unwrap().to_str().unwrap());
         std::process::exit(1);
     };
-    if !fs::metadata(path).unwrap().is_file() {
+    if !fs::metadata(path)?.is_file() {
         eprintln!("ERROR input file `{}` not a file", path.as_path().file_name().unwrap().to_str().unwrap());
         std::process::exit(1);
     };
@@ -1997,14 +2002,14 @@ fn main() {
     };
     let tokens = load_tokens(&input_file, debug_level).unwrap();
     let include_depth: Vec<PathBuf> = Vec::new();
-    let tokens_post_include = preprocessor_include(tokens, include_depth, debug_level);
-    let tokens_post_define = preprocessor_define(tokens_post_include, debug_level);
+    let tokens_post_include = preprocessor_include(tokens, include_depth, debug_level).unwrap();
+    let tokens_post_define = preprocessor_define(tokens_post_include, debug_level).unwrap();
     let (tokens_post_function, function_defs) =
-        preprocessor_function(tokens_post_define, debug_level);
+        preprocessor_function(tokens_post_define, debug_level).unwrap();
     let (tokens_post_parse, function_defs) =
-        parse_tokens(tokens_post_function, function_defs, debug_level);
+        parse_tokens(tokens_post_function, function_defs, debug_level).unwrap();
     let (program, function_defs, required_labels) =
-        locate_blocks(tokens_post_parse, function_defs, debug_level);
+        locate_blocks(tokens_post_parse, function_defs, debug_level).unwrap();
     compile_to_elf64_asm(
         program,
         function_defs,
@@ -2012,7 +2017,7 @@ fn main() {
         PathBuf::from(asm_file.clone()),
         assembler,
         debug_level,
-    );
+    ).unwrap();
     let assembler_command = match assembler {
         Assembler::Fasm => {
             let mut assembler_command = Command::new("fasm");
@@ -2032,17 +2037,17 @@ fn main() {
             assembler_command
         }
     };
-    run_cmd(assembler_command, debug_level);
+    run_cmd(assembler_command, debug_level).unwrap();
     let mut ld_command = Command::new("ld");
     ld_command
         .arg("-o")
         .arg(output_file.clone())
         .arg(o_file.clone());
-    run_cmd(ld_command, debug_level);
+    run_cmd(ld_command, debug_level).unwrap();
     let mut cleanup_command = Command::new("rm");
     cleanup_command.arg(o_file);
     if debug_level < 1 {
         cleanup_command.arg(asm_file);
     };
-    run_cmd(cleanup_command, debug_level);
+    run_cmd(cleanup_command, debug_level).unwrap();
 }
