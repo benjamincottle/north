@@ -142,7 +142,7 @@ Usage: cargo case [COMMAND]
 | operator | description |
 | -------- | ----------- |
 | `&`      | (x, y) -> (x & y) |
-| `|`      | (x, y) -> (x | y) |
+| `\|`      | (x, y) -> (x \| y) |
 | `~`      | (x)    -> (~x) |
 | `^`      | (x, y) -> (x ^ y) |
 | `<<`     | (x, y) -> (x << y) |
