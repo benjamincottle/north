@@ -7,6 +7,7 @@ use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 use std::process::{Command, Stdio};
 use std::{fmt, fs};
+use std::error::Error;
 
 const MAX_INCLUDE_DEPTH: u32 = 58;
 const MEMORY_SIZE: &str = "0x1f400";
@@ -215,7 +216,9 @@ struct Define {
     tokens: Vec<((PathBuf, usize, usize), (TokenType, String))>,
 }
 
-fn print_compilation_message(token_loc: (PathBuf, usize, usize), error_msg: &str) -> std::io::Result<()> {
+type TokenLoc = (PathBuf, usize, usize);
+
+fn print_compilation_message(token_loc: TokenLoc, error_msg: &str) -> std::io::Result<()> {
     let input_file = File::open(token_loc.0.clone()).expect("failed to open input file");
     let input_line = BufReader::new(input_file)
         .lines()
@@ -1963,7 +1966,7 @@ fn load_tokens(
     }
     Ok(tokens)
 }
-fn main() {
+fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
     let assembler = match args.assembler {
         Some(Assembler::Fasm) => Assembler::Fasm,
@@ -2000,16 +2003,16 @@ fn main() {
     } else {
         format!("{}", output_file)
     };
-    let tokens = load_tokens(&input_file, debug_level).unwrap();
+    let tokens = load_tokens(&input_file, debug_level)?;
     let include_depth: Vec<PathBuf> = Vec::new();
-    let tokens_post_include = preprocessor_include(tokens, include_depth, debug_level).unwrap();
-    let tokens_post_define = preprocessor_define(tokens_post_include, debug_level).unwrap();
+    let tokens_post_include = preprocessor_include(tokens, include_depth, debug_level)?;
+    let tokens_post_define = preprocessor_define(tokens_post_include, debug_level)?;
     let (tokens_post_function, function_defs) =
-        preprocessor_function(tokens_post_define, debug_level).unwrap();
+        preprocessor_function(tokens_post_define, debug_level)?;
     let (tokens_post_parse, function_defs) =
-        parse_tokens(tokens_post_function, function_defs, debug_level).unwrap();
+        parse_tokens(tokens_post_function, function_defs, debug_level)?;
     let (program, function_defs, required_labels) =
-        locate_blocks(tokens_post_parse, function_defs, debug_level).unwrap();
+        locate_blocks(tokens_post_parse, function_defs, debug_level)?;
     compile_to_elf64_asm(
         program,
         function_defs,
@@ -2017,7 +2020,7 @@ fn main() {
         PathBuf::from(asm_file.clone()),
         assembler,
         debug_level,
-    ).unwrap();
+    )?;
     let assembler_command = match assembler {
         Assembler::Fasm => {
             let mut assembler_command = Command::new("fasm");
@@ -2037,17 +2040,18 @@ fn main() {
             assembler_command
         }
     };
-    run_cmd(assembler_command, debug_level).unwrap();
+    run_cmd(assembler_command, debug_level)?;
     let mut ld_command = Command::new("ld");
     ld_command
         .arg("-o")
         .arg(output_file.clone())
         .arg(o_file.clone());
-    run_cmd(ld_command, debug_level).unwrap();
+    run_cmd(ld_command, debug_level)?;
     let mut cleanup_command = Command::new("rm");
     cleanup_command.arg(o_file);
     if debug_level < 1 {
         cleanup_command.arg(asm_file);
     };
-    run_cmd(cleanup_command, debug_level).unwrap();
+    run_cmd(cleanup_command, debug_level)?;
+    Ok(())
 }
